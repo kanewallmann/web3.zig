@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">    <title>abi.zig - source view</title>
+    <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAPNJREFUeNpi/P//PwMlgOXHUjly9E0G4hwgZmQiQZMqEK8H4v9QzUEgQSaoADK+zhH9iAGL+C0gDoAaNg9mGLoLfgA1awK9hS9gzgJxA9RQBmQDrgMxJzRMGKE4HYj/Ial5A8QmQLwCJoBsgBYW2+TR1ChDaWt4LOBxKsi/VUh8XiD+gq4IVyzwQAMJBoKwacZlAB8Qf0bi96IZhtOAe1D6LpqaEiz6rmEzQAeIzwGxCJpieFqApo/vQKyJboAaEBsAsSEupwI1MwKjGBTVHOhegMX5UajYRqiBjMgYmj400cVh0XgTiKdC0zhJgJHS7AwQYABm9EAdCKrEfAAAAABJRU5ErkJggg=="/>
+    <style>
+      body{
+        font-family: system-ui, -apple-system, Roboto, "Segoe UI", sans-serif;
+        margin: 0;
+        line-height: 1.5;
+      }
+
+      pre > code {
+        display: block;
+        overflow: auto;
+        line-height: normal;
+        margin: 0em;
+      }
+      .tok-kw {
+          color: #333;
+          font-weight: bold;
+      }
+      .tok-str {
+          color: #d14;
+      }
+      .tok-builtin {
+          color: #005C7A;
+      }
+      .tok-comment {
+          color: #545454;
+          font-style: italic;
+      }
+      .tok-fn {
+          color: #900;
+          font-weight: bold;
+      }
+      .tok-null {
+          color: #005C5C;
+      }
+      .tok-number {
+          color: #005C5C;
+      }
+      .tok-type {
+          color: #458;
+          font-weight: bold;
+      }
+      pre {
+        counter-reset: line;
+      }
+      pre .line:before {
+        counter-increment: line;
+        content: counter(line);
+        display: inline-block;
+        padding-right: 1em;
+        width: 2em;
+        text-align: right;
+        color: #999;
+      }
+      
+      .line {
+        width: 100%;
+        display: inline-block;
+      }
+      .line:target {
+        border-top: 1px solid #ccc;
+        border-bottom: 1px solid #ccc;
+        background: #fafafa;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body{
+            background:#222;
+            color: #ccc;
+        }
+        pre > code {
+            color: #ccc;
+            background: #222;
+            border: unset;
+        }
+        .line:target {
+            border-top: 1px solid #444;
+            border-bottom: 1px solid #444;
+            background: #333;
+        }
+        .tok-kw {
+            color: #eee;
+        }
+        .tok-str {
+            color: #2e5;
+        }
+        .tok-builtin {
+            color: #ff894c;
+        }
+        .tok-comment {
+            color: #aa7;
+        }
+        .tok-fn {
+            color: #B1A0F8;
+        }
+        .tok-null {
+            color: #ff8080;
+        }
+        .tok-number {
+            color: #ff8080;
+        }
+        .tok-type {
+            color: #68f;
+        }
+      }
+    </style>
+</head>
+<body>
+<pre><code><span class="line" id="L1"><span class="tok-kw">const</span> std = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;std&quot;</span>);</span>
+<span class="line" id="L2"></span>
+<span class="line" id="L3"><span class="tok-kw">const</span> web3 = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;web3.zig&quot;</span>);</span>
+<span class="line" id="L4"><span class="tok-kw">const</span> parser_allocator = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;parser_allocator.zig&quot;</span>);</span>
+<span class="line" id="L5"></span>
+<span class="line" id="L6"><span class="tok-comment">// Note: This struct must be identical to `AbiInput`</span>
+</span>
+<span class="line" id="L7"><span class="tok-kw">const</span> JsonAbiInput = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L8">    name: ?[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
+<span class="line" id="L9">    <span class="tok-type">type</span>: *web3.AbiType,</span>
+<span class="line" id="L10">    indexed: ?<span class="tok-type">bool</span>,</span>
+<span class="line" id="L11">};</span>
+<span class="line" id="L12"></span>
+<span class="line" id="L13"><span class="tok-comment">// Note: This struct must be identical to `AbiOutput`</span>
+</span>
+<span class="line" id="L14"><span class="tok-kw">const</span> JsonAbiOutput = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L15">    name: ?[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
+<span class="line" id="L16">    <span class="tok-type">type</span>: *web3.AbiType,</span>
+<span class="line" id="L17">};</span>
+<span class="line" id="L18"></span>
+<span class="line" id="L19"><span class="tok-comment">// Note: This struct must be identical to `AbiEntry`</span>
+</span>
+<span class="line" id="L20"><span class="tok-kw">const</span> JsonAbiEntry = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L21">    name: ?[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
+<span class="line" id="L22">    <span class="tok-type">type</span>: <span class="tok-kw">enum</span> { function, constructor, receive, fallback, event },</span>
+<span class="line" id="L23">    inputs: ?[]JsonAbiInput,</span>
+<span class="line" id="L24">    outputs: ?[]JsonAbiOutput,</span>
+<span class="line" id="L25">    stateMutability: ?<span class="tok-kw">enum</span> { pure, view, nonpayable, payable } = <span class="tok-null">null</span>,</span>
+<span class="line" id="L26">};</span>
+<span class="line" id="L27"></span>
+<span class="line" id="L28"><span class="tok-comment">/// Represents an input in an ABI entry</span></span>
+<span class="line" id="L29"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> AbiInput = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L30">    name: ?[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
+<span class="line" id="L31">    <span class="tok-type">type</span>: *web3.AbiType,</span>
+<span class="line" id="L32">    indexed: ?<span class="tok-type">bool</span>,</span>
+<span class="line" id="L33"></span>
+<span class="line" id="L34">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">deinit</span>(self: AbiInput, allocator: std.mem.Allocator) <span class="tok-type">void</span> {</span>
+<span class="line" id="L35">        <span class="tok-kw">if</span> (self.name) |name| {</span>
+<span class="line" id="L36">            allocator.free(name);</span>
+<span class="line" id="L37">        }</span>
+<span class="line" id="L38">        self.<span class="tok-type">type</span>.deinit(allocator);</span>
+<span class="line" id="L39">    }</span>
+<span class="line" id="L40">};</span>
+<span class="line" id="L41"></span>
+<span class="line" id="L42"><span class="tok-comment">/// Reperesents an output in an ABI entry</span></span>
+<span class="line" id="L43"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> AbiOutput = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L44">    name: ?[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
+<span class="line" id="L45">    <span class="tok-type">type</span>: *web3.AbiType,</span>
+<span class="line" id="L46"></span>
+<span class="line" id="L47">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">deinit</span>(self: AbiOutput, allocator: std.mem.Allocator) <span class="tok-type">void</span> {</span>
+<span class="line" id="L48">        <span class="tok-kw">if</span> (self.name) |name| {</span>
+<span class="line" id="L49">            allocator.free(name);</span>
+<span class="line" id="L50">        }</span>
+<span class="line" id="L51">        self.<span class="tok-type">type</span>.deinit(allocator);</span>
+<span class="line" id="L52">    }</span>
+<span class="line" id="L53">};</span>
+<span class="line" id="L54"></span>
+<span class="line" id="L55"><span class="tok-comment">/// Represents a single ABI entry</span></span>
+<span class="line" id="L56"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> AbiEntry = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L57">    name: ?[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
+<span class="line" id="L58">    <span class="tok-type">type</span>: <span class="tok-kw">enum</span> { function, constructor, receive, fallback, event },</span>
+<span class="line" id="L59">    inputs: ?[]AbiInput,</span>
+<span class="line" id="L60">    outputs: ?[]AbiOutput,</span>
+<span class="line" id="L61">    state_mutability: ?<span class="tok-kw">enum</span> { pure, view, nonpayable, payable },</span>
+<span class="line" id="L62"></span>
+<span class="line" id="L63">    <span class="tok-comment">// Recursively frees owned memory</span>
+</span>
+<span class="line" id="L64">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">deinit</span>(self: AbiEntry, allocator: std.mem.Allocator) <span class="tok-type">void</span> {</span>
+<span class="line" id="L65">        <span class="tok-kw">if</span> (self.name) |name| {</span>
+<span class="line" id="L66">            allocator.free(name);</span>
+<span class="line" id="L67">        }</span>
+<span class="line" id="L68">        <span class="tok-kw">if</span> (self.inputs) |inputs| {</span>
+<span class="line" id="L69">            <span class="tok-kw">for</span> (inputs) |input| {</span>
+<span class="line" id="L70">                input.deinit(allocator);</span>
+<span class="line" id="L71">            }</span>
+<span class="line" id="L72">            allocator.free(inputs);</span>
+<span class="line" id="L73">        }</span>
+<span class="line" id="L74">        <span class="tok-kw">if</span> (self.outputs) |outputs| {</span>
+<span class="line" id="L75">            <span class="tok-kw">for</span> (outputs) |output| {</span>
+<span class="line" id="L76">                output.deinit(allocator);</span>
+<span class="line" id="L77">            }</span>
+<span class="line" id="L78">            allocator.free(outputs);</span>
+<span class="line" id="L79">        }</span>
+<span class="line" id="L80">    }</span>
+<span class="line" id="L81"></span>
+<span class="line" id="L82">    <span class="tok-comment">/// Computes the 4 byte function selector</span></span>
+<span class="line" id="L83">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">computeSelector</span>(self: *<span class="tok-kw">const</span> AbiEntry) ![<span class="tok-number">4</span>]<span class="tok-type">u8</span> {</span>
+<span class="line" id="L84">        std.debug.assert(self.<span class="tok-type">type</span> == .function);</span>
+<span class="line" id="L85"></span>
+<span class="line" id="L86">        <span class="tok-comment">// Allocate temporary memory to construct the function sig</span>
+</span>
+<span class="line" id="L87">        <span class="tok-kw">var</span> gpa = std.heap.GeneralPurposeAllocator(.{}){};</span>
+<span class="line" id="L88">        <span class="tok-kw">var</span> allocator = gpa.allocator();</span>
+<span class="line" id="L89">        <span class="tok-kw">var</span> func_sig_buffer = <span class="tok-kw">try</span> std.ArrayList(<span class="tok-type">u8</span>).initCapacity(allocator, <span class="tok-number">1024</span>);</span>
+<span class="line" id="L90">        <span class="tok-kw">defer</span> func_sig_buffer.deinit();</span>
+<span class="line" id="L91"></span>
+<span class="line" id="L92">        <span class="tok-kw">var</span> writer = func_sig_buffer.writer();</span>
+<span class="line" id="L93">        <span class="tok-kw">try</span> self.formatSignature(writer);</span>
+<span class="line" id="L94"></span>
+<span class="line" id="L95">        <span class="tok-kw">var</span> hash_buffer: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L96"></span>
+<span class="line" id="L97">        <span class="tok-comment">// Hash the function sig</span>
+</span>
+<span class="line" id="L98">        std.crypto.hash.sha3.Keccak256.hash(func_sig_buffer.items, &amp;hash_buffer, .{});</span>
+<span class="line" id="L99"></span>
+<span class="line" id="L100">        <span class="tok-kw">var</span> result: [<span class="tok-number">4</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L101">        <span class="tok-builtin">@memcpy</span>(&amp;result, hash_buffer[<span class="tok-number">0</span>..<span class="tok-number">4</span>]);</span>
+<span class="line" id="L102"></span>
+<span class="line" id="L103">        <span class="tok-kw">return</span> result;</span>
+<span class="line" id="L104">    }</span>
+<span class="line" id="L105"></span>
+<span class="line" id="L106">    <span class="tok-comment">/// Computes the log topic for this event</span></span>
+<span class="line" id="L107">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">computeTopic</span>(self: *<span class="tok-kw">const</span> AbiEntry) !web3.Hash {</span>
+<span class="line" id="L108">        std.debug.assert(self.<span class="tok-type">type</span> == .event);</span>
+<span class="line" id="L109"></span>
+<span class="line" id="L110">        <span class="tok-comment">// Allocate temporary memory to construct the function sig</span>
+</span>
+<span class="line" id="L111">        <span class="tok-kw">var</span> gpa = std.heap.GeneralPurposeAllocator(.{}){};</span>
+<span class="line" id="L112">        <span class="tok-kw">var</span> allocator = gpa.allocator();</span>
+<span class="line" id="L113">        <span class="tok-kw">var</span> func_sig_buffer = <span class="tok-kw">try</span> std.ArrayList(<span class="tok-type">u8</span>).initCapacity(allocator, <span class="tok-number">1024</span>);</span>
+<span class="line" id="L114">        <span class="tok-kw">defer</span> func_sig_buffer.deinit();</span>
+<span class="line" id="L115"></span>
+<span class="line" id="L116">        <span class="tok-kw">var</span> writer = func_sig_buffer.writer();</span>
+<span class="line" id="L117">        <span class="tok-kw">try</span> self.formatSignature(writer);</span>
+<span class="line" id="L118"></span>
+<span class="line" id="L119">        <span class="tok-kw">var</span> hash_buffer: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L120"></span>
+<span class="line" id="L121">        <span class="tok-comment">// Hash the function sig</span>
+</span>
+<span class="line" id="L122">        std.crypto.hash.sha3.Keccak256.hash(func_sig_buffer.items, &amp;hash_buffer, .{});</span>
+<span class="line" id="L123"></span>
+<span class="line" id="L124">        <span class="tok-kw">return</span> web3.Hash.wrap(&amp;hash_buffer);</span>
+<span class="line" id="L125">    }</span>
+<span class="line" id="L126"></span>
+<span class="line" id="L127">    <span class="tok-comment">/// Formats this entry as per the ABI function/event signature specifications</span></span>
+<span class="line" id="L128">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">formatSignature</span>(self: *<span class="tok-kw">const</span> AbiEntry, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L129">        std.debug.assert(self.<span class="tok-type">type</span> == .event <span class="tok-kw">or</span> self.<span class="tok-type">type</span> == .function);</span>
+<span class="line" id="L130"></span>
+<span class="line" id="L131">        <span class="tok-kw">if</span> (self.name == <span class="tok-null">null</span>) {</span>
+<span class="line" id="L132">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.NoName;</span>
+<span class="line" id="L133">        }</span>
+<span class="line" id="L134">        _ = <span class="tok-kw">try</span> writer.write(self.name.?);</span>
+<span class="line" id="L135">        <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">'('</span>);</span>
+<span class="line" id="L136"></span>
+<span class="line" id="L137">        <span class="tok-kw">if</span> (self.inputs) |inputs| {</span>
+<span class="line" id="L138">            <span class="tok-kw">var</span> first = <span class="tok-null">true</span>;</span>
+<span class="line" id="L139">            <span class="tok-kw">for</span> (inputs) |input| {</span>
+<span class="line" id="L140">                <span class="tok-kw">if</span> (!first) {</span>
+<span class="line" id="L141">                    <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">','</span>);</span>
+<span class="line" id="L142">                }</span>
+<span class="line" id="L143">                first = <span class="tok-null">false</span>;</span>
+<span class="line" id="L144">                _ = <span class="tok-kw">try</span> writer.print(<span class="tok-str">&quot;{}&quot;</span>, .{input.<span class="tok-type">type</span>});</span>
+<span class="line" id="L145">            }</span>
+<span class="line" id="L146">        }</span>
+<span class="line" id="L147"></span>
+<span class="line" id="L148">        <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">')'</span>);</span>
+<span class="line" id="L149">    }</span>
+<span class="line" id="L150"></span>
+<span class="line" id="L151">    <span class="tok-comment">/// Format helper</span></span>
+<span class="line" id="L152">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">format</span>(self: *<span class="tok-kw">const</span> AbiEntry, <span class="tok-kw">comptime</span> _: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, _: std.fmt.FormatOptions, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L153">        _ = <span class="tok-kw">try</span> writer.write(<span class="tok-builtin">@tagName</span>(self.<span class="tok-type">type</span>));</span>
+<span class="line" id="L154">        <span class="tok-kw">if</span> (self.name) |name| {</span>
+<span class="line" id="L155">            _ = <span class="tok-kw">try</span> writer.write(<span class="tok-str">&quot; &quot;</span>);</span>
+<span class="line" id="L156">            _ = <span class="tok-kw">try</span> writer.write(name);</span>
+<span class="line" id="L157">        }</span>
+<span class="line" id="L158">        <span class="tok-kw">if</span> (self.inputs) |inputs| {</span>
+<span class="line" id="L159">            <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">'('</span>);</span>
+<span class="line" id="L160">            <span class="tok-kw">var</span> first = <span class="tok-null">true</span>;</span>
+<span class="line" id="L161">            <span class="tok-kw">for</span> (inputs) |input| {</span>
+<span class="line" id="L162">                <span class="tok-kw">if</span> (!first) {</span>
+<span class="line" id="L163">                    <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">','</span>);</span>
+<span class="line" id="L164">                }</span>
+<span class="line" id="L165">                first = <span class="tok-null">false</span>;</span>
+<span class="line" id="L166">                _ = <span class="tok-kw">try</span> writer.print(<span class="tok-str">&quot;{}&quot;</span>, .{input.<span class="tok-type">type</span>});</span>
+<span class="line" id="L167">                <span class="tok-kw">if</span> (input.indexed != <span class="tok-null">null</span> <span class="tok-kw">and</span> input.indexed.?) {</span>
+<span class="line" id="L168">                    _ = <span class="tok-kw">try</span> writer.write(<span class="tok-str">&quot; indexed&quot;</span>);</span>
+<span class="line" id="L169">                }</span>
+<span class="line" id="L170">                <span class="tok-kw">if</span> (input.name) |name| {</span>
+<span class="line" id="L171">                    <span class="tok-kw">if</span> (name.len &gt; <span class="tok-number">0</span>) {</span>
+<span class="line" id="L172">                        <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">' '</span>);</span>
+<span class="line" id="L173">                        _ = <span class="tok-kw">try</span> writer.write(name);</span>
+<span class="line" id="L174">                    }</span>
+<span class="line" id="L175">                }</span>
+<span class="line" id="L176">            }</span>
+<span class="line" id="L177">            <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">')'</span>);</span>
+<span class="line" id="L178">        }</span>
+<span class="line" id="L179">        <span class="tok-kw">if</span> (self.state_mutability) |state_mutability| {</span>
+<span class="line" id="L180">            <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">' '</span>);</span>
+<span class="line" id="L181">            _ = <span class="tok-kw">try</span> writer.write(<span class="tok-builtin">@tagName</span>(state_mutability));</span>
+<span class="line" id="L182">        }</span>
+<span class="line" id="L183">        <span class="tok-kw">if</span> (self.outputs) |outputs| {</span>
+<span class="line" id="L184">            _ = <span class="tok-kw">try</span> writer.write(<span class="tok-str">&quot; returns (&quot;</span>);</span>
+<span class="line" id="L185">            <span class="tok-kw">var</span> first = <span class="tok-null">true</span>;</span>
+<span class="line" id="L186">            <span class="tok-kw">for</span> (outputs) |output| {</span>
+<span class="line" id="L187">                <span class="tok-kw">if</span> (!first) {</span>
+<span class="line" id="L188">                    <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">','</span>);</span>
+<span class="line" id="L189">                }</span>
+<span class="line" id="L190">                first = <span class="tok-null">false</span>;</span>
+<span class="line" id="L191">                _ = <span class="tok-kw">try</span> writer.print(<span class="tok-str">&quot;{}&quot;</span>, .{output.<span class="tok-type">type</span>});</span>
+<span class="line" id="L192">                <span class="tok-kw">if</span> (output.name) |name| {</span>
+<span class="line" id="L193">                    <span class="tok-kw">if</span> (name.len &gt; <span class="tok-number">0</span>) {</span>
+<span class="line" id="L194">                        <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">' '</span>);</span>
+<span class="line" id="L195">                        _ = <span class="tok-kw">try</span> writer.write(name);</span>
+<span class="line" id="L196">                    }</span>
+<span class="line" id="L197">                }</span>
+<span class="line" id="L198">            }</span>
+<span class="line" id="L199">            <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">')'</span>);</span>
+<span class="line" id="L200">        }</span>
+<span class="line" id="L201">    }</span>
+<span class="line" id="L202">};</span>
+<span class="line" id="L203"></span>
+<span class="line" id="L204"><span class="tok-kw">comptime</span> {</span>
+<span class="line" id="L205">    <span class="tok-comment">// Not a perfect comparison but can catch mistakes early</span>
+</span>
+<span class="line" id="L206">    std.debug.assert(<span class="tok-builtin">@sizeOf</span>(JsonAbiInput) == <span class="tok-builtin">@sizeOf</span>(AbiInput));</span>
+<span class="line" id="L207">    std.debug.assert(<span class="tok-builtin">@typeInfo</span>(JsonAbiInput).Struct.fields.len == <span class="tok-builtin">@typeInfo</span>(AbiInput).Struct.fields.len);</span>
+<span class="line" id="L208">    std.debug.assert(<span class="tok-builtin">@sizeOf</span>(JsonAbiOutput) == <span class="tok-builtin">@sizeOf</span>(AbiOutput));</span>
+<span class="line" id="L209">    std.debug.assert(<span class="tok-builtin">@typeInfo</span>(JsonAbiOutput).Struct.fields.len == <span class="tok-builtin">@typeInfo</span>(AbiOutput).Struct.fields.len);</span>
+<span class="line" id="L210">    std.debug.assert(<span class="tok-builtin">@sizeOf</span>(JsonAbiEntry) == <span class="tok-builtin">@sizeOf</span>(AbiEntry));</span>
+<span class="line" id="L211">    std.debug.assert(<span class="tok-builtin">@typeInfo</span>(JsonAbiEntry).Struct.fields.len == <span class="tok-builtin">@typeInfo</span>(AbiEntry).Struct.fields.len);</span>
+<span class="line" id="L212">}</span>
+<span class="line" id="L213"></span>
+<span class="line" id="L214"><span class="tok-comment">/// Wrapper around an array of ABI entries</span></span>
+<span class="line" id="L215"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> Abi = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L216">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L217"></span>
+<span class="line" id="L218">    entries: []AbiEntry,</span>
+<span class="line" id="L219"></span>
+<span class="line" id="L220">    <span class="tok-comment">/// Frees all owned memory</span></span>
+<span class="line" id="L221">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">deinit</span>(self: Self, allocator: std.mem.Allocator) <span class="tok-type">void</span> {</span>
+<span class="line" id="L222">        <span class="tok-kw">for</span> (self.entries) |entry| {</span>
+<span class="line" id="L223">            entry.deinit(allocator);</span>
+<span class="line" id="L224">        }</span>
+<span class="line" id="L225">        allocator.free(self.entries);</span>
+<span class="line" id="L226">    }</span>
+<span class="line" id="L227"></span>
+<span class="line" id="L228">    <span class="tok-comment">/// Finds an ABI entry with matching method name and args</span></span>
+<span class="line" id="L229">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">findEntry</span>(self: *<span class="tok-kw">const</span> Self, method: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, arg_types: []*<span class="tok-kw">const</span> web3.AbiType) !?*web3.abi.AbiEntry {</span>
+<span class="line" id="L230">        <span class="tok-kw">var</span> entry: ?*web3.abi.AbiEntry = data: <span class="tok-kw">for</span> (self.entries) |*entry| {</span>
+<span class="line" id="L231">            <span class="tok-kw">if</span> (entry.name) |entry_name| {</span>
+<span class="line" id="L232">                <span class="tok-kw">if</span> (std.mem.eql(<span class="tok-type">u8</span>, method, entry_name)) {</span>
+<span class="line" id="L233">                    <span class="tok-kw">if</span> (entry.inputs) |inputs| {</span>
+<span class="line" id="L234">                        <span class="tok-kw">if</span> (inputs.len != arg_types.len) {</span>
+<span class="line" id="L235">                            <span class="tok-kw">continue</span>;</span>
+<span class="line" id="L236">                        }</span>
+<span class="line" id="L237">                        <span class="tok-kw">for</span> (arg_types, <span class="tok-number">0</span>..) |arg_type, i| {</span>
+<span class="line" id="L238">                            <span class="tok-kw">if</span> (!std.meta.eql(arg_type, inputs[i].<span class="tok-type">type</span>)) {</span>
+<span class="line" id="L239">                                <span class="tok-kw">continue</span> :data;</span>
+<span class="line" id="L240">                            }</span>
+<span class="line" id="L241">                        }</span>
+<span class="line" id="L242">                        <span class="tok-kw">break</span> :data entry;</span>
+<span class="line" id="L243">                    }</span>
+<span class="line" id="L244">                }</span>
+<span class="line" id="L245">            }</span>
+<span class="line" id="L246">        };</span>
+<span class="line" id="L247"></span>
+<span class="line" id="L248">        <span class="tok-kw">return</span> entry;</span>
+<span class="line" id="L249">    }</span>
+<span class="line" id="L250"></span>
+<span class="line" id="L251">    <span class="tok-comment">/// Finds the first ABI entry with the given method name</span></span>
+<span class="line" id="L252">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">findFirstEntry</span>(self: *<span class="tok-kw">const</span> Self, method: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !?*web3.abi.AbiEntry {</span>
+<span class="line" id="L253">        <span class="tok-kw">var</span> entry: ?*web3.abi.AbiEntry = data: <span class="tok-kw">for</span> (self.entries) |*entry| {</span>
+<span class="line" id="L254">            <span class="tok-kw">if</span> (entry.name) |entry_name| {</span>
+<span class="line" id="L255">                <span class="tok-kw">if</span> (std.mem.eql(<span class="tok-type">u8</span>, method, entry_name)) {</span>
+<span class="line" id="L256">                    <span class="tok-kw">break</span> :data entry;</span>
+<span class="line" id="L257">                }</span>
+<span class="line" id="L258">            }</span>
+<span class="line" id="L259">        };</span>
+<span class="line" id="L260"></span>
+<span class="line" id="L261">        <span class="tok-kw">return</span> entry;</span>
+<span class="line" id="L262">    }</span>
+<span class="line" id="L263">};</span>
+<span class="line" id="L264"></span>
+<span class="line" id="L265"><span class="tok-comment">/// Encodes appended values per ABI convention</span></span>
+<span class="line" id="L266"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> CalldataArgEncoder = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L267">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L268"></span>
+<span class="line" id="L269">    calldata_args: std.ArrayList(<span class="tok-type">u8</span>),</span>
+<span class="line" id="L270">    calldata_extra: std.ArrayList(<span class="tok-type">u8</span>),</span>
+<span class="line" id="L271"></span>
+<span class="line" id="L272">    <span class="tok-comment">/// Initialize memory</span></span>
+<span class="line" id="L273">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">init</span>(allocator: std.mem.Allocator) Self {</span>
+<span class="line" id="L274">        <span class="tok-kw">return</span> Self{</span>
+<span class="line" id="L275">            .calldata_args = std.ArrayList(<span class="tok-type">u8</span>).init(allocator),</span>
+<span class="line" id="L276">            .calldata_extra = std.ArrayList(<span class="tok-type">u8</span>).init(allocator),</span>
+<span class="line" id="L277">        };</span>
+<span class="line" id="L278">    }</span>
+<span class="line" id="L279"></span>
+<span class="line" id="L280">    <span class="tok-comment">/// Frees owned memory</span></span>
+<span class="line" id="L281">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">deinit</span>(self: *Self) <span class="tok-type">void</span> {</span>
+<span class="line" id="L282">        self.calldata_args.clearAndFree();</span>
+<span class="line" id="L283">        self.calldata_extra.clearAndFree();</span>
+<span class="line" id="L284">    }</span>
+<span class="line" id="L285"></span>
+<span class="line" id="L286">    <span class="tok-comment">/// Appends a new value to the calldata.</span></span>
+<span class="line" id="L287">    <span class="tok-comment">/// `arg_type` is the ABI type of the argument.</span></span>
+<span class="line" id="L288">    <span class="tok-comment">/// `arg` is the value to coerce into the desired type.</span></span>
+<span class="line" id="L289">    <span class="tok-comment">/// Errors if the given value cannot be coerced into the desired ABI type.</span></span>
+<span class="line" id="L290">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">append</span>(self: *Self, arg_type: *<span class="tok-kw">const</span> web3.AbiType, arg: <span class="tok-kw">anytype</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L291">        <span class="tok-kw">const</span> ATT = <span class="tok-builtin">@typeInfo</span>(<span class="tok-builtin">@TypeOf</span>(arg));</span>
+<span class="line" id="L292">        <span class="tok-kw">switch</span> (ATT) {</span>
+<span class="line" id="L293">            .Int =&gt; |arg_int| {</span>
+<span class="line" id="L294">                <span class="tok-kw">switch</span> (arg_int.signedness) {</span>
+<span class="line" id="L295">                    .signed =&gt; {</span>
+<span class="line" id="L296">                        <span class="tok-kw">switch</span> (arg_type.*) {</span>
+<span class="line" id="L297">                            .int =&gt; |int| {</span>
+<span class="line" id="L298">                                <span class="tok-kw">const</span> arg_i256: <span class="tok-type">i256</span> = <span class="tok-builtin">@intCast</span>(arg);</span>
+<span class="line" id="L299">                                <span class="tok-kw">const</span> max_value: <span class="tok-type">u256</span> = std.math.pow(<span class="tok-type">u256</span>, <span class="tok-number">2</span>, int.bits - <span class="tok-number">1</span>) - <span class="tok-number">1</span>;</span>
+<span class="line" id="L300">                                <span class="tok-kw">if</span> (arg_i256 &gt; max_value) {</span>
+<span class="line" id="L301">                                    <span class="tok-kw">return</span> <span class="tok-kw">error</span>.IntegerOverflow;</span>
+<span class="line" id="L302">                                }</span>
+<span class="line" id="L303">                                <span class="tok-kw">const</span> min_value: <span class="tok-type">i256</span> = -<span class="tok-builtin">@as</span>(<span class="tok-type">i256</span>, <span class="tok-builtin">@intCast</span>(max_value)) - <span class="tok-number">1</span>;</span>
+<span class="line" id="L304">                                <span class="tok-kw">if</span> (arg_i256 &lt; min_value) {</span>
+<span class="line" id="L305">                                    <span class="tok-kw">return</span> <span class="tok-kw">error</span>.IntegerUnderflow;</span>
+<span class="line" id="L306">                                }</span>
+<span class="line" id="L307">                                <span class="tok-kw">try</span> self.calldata_args.ensureUnusedCapacity(<span class="tok-number">32</span>);</span>
+<span class="line" id="L308">                                <span class="tok-kw">const</span> i = self.calldata_args.items.len;</span>
+<span class="line" id="L309">                                self.calldata_args.items.len += <span class="tok-number">32</span>;</span>
+<span class="line" id="L310">                                std.mem.writeIntBig(<span class="tok-type">i256</span>, self.calldata_args.items[i..][<span class="tok-number">0</span>..<span class="tok-number">32</span>], arg_i256);</span>
+<span class="line" id="L311">                            },</span>
+<span class="line" id="L312">                            <span class="tok-kw">else</span> =&gt; <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidCoercion,</span>
+<span class="line" id="L313">                        }</span>
+<span class="line" id="L314">                    },</span>
+<span class="line" id="L315">                    .unsigned =&gt; {</span>
+<span class="line" id="L316">                        <span class="tok-kw">switch</span> (arg_type.*) {</span>
+<span class="line" id="L317">                            .uint =&gt; |uint| {</span>
+<span class="line" id="L318">                                <span class="tok-kw">const</span> arg_u256: <span class="tok-type">u256</span> = <span class="tok-builtin">@intCast</span>(arg);</span>
+<span class="line" id="L319">                                <span class="tok-kw">if</span> (uint.bits &lt; <span class="tok-number">256</span>) {</span>
+<span class="line" id="L320">                                    <span class="tok-kw">const</span> max_value: <span class="tok-type">u256</span> = std.math.pow(<span class="tok-type">u256</span>, <span class="tok-number">2</span>, uint.bits) - <span class="tok-number">1</span>;</span>
+<span class="line" id="L321">                                    <span class="tok-kw">if</span> (arg_u256 &gt; max_value) {</span>
+<span class="line" id="L322">                                        <span class="tok-kw">return</span> <span class="tok-kw">error</span>.IntegerOverflow;</span>
+<span class="line" id="L323">                                    }</span>
+<span class="line" id="L324">                                }</span>
+<span class="line" id="L325">                                <span class="tok-kw">try</span> self.calldata_args.ensureUnusedCapacity(<span class="tok-number">32</span>);</span>
+<span class="line" id="L326">                                <span class="tok-kw">const</span> i = self.calldata_args.items.len;</span>
+<span class="line" id="L327">                                self.calldata_args.items.len += <span class="tok-number">32</span>;</span>
+<span class="line" id="L328">                                std.mem.writeIntBig(<span class="tok-type">u256</span>, self.calldata_args.items[i..][<span class="tok-number">0</span>..<span class="tok-number">32</span>], arg_u256);</span>
+<span class="line" id="L329">                            },</span>
+<span class="line" id="L330">                            <span class="tok-kw">else</span> =&gt; <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidCoercion,</span>
+<span class="line" id="L331">                        }</span>
+<span class="line" id="L332">                    },</span>
+<span class="line" id="L333">                }</span>
+<span class="line" id="L334">            },</span>
+<span class="line" id="L335">            .Bool =&gt; {</span>
+<span class="line" id="L336">                <span class="tok-kw">switch</span> (arg_type.*) {</span>
+<span class="line" id="L337">                    .boolean =&gt; {</span>
+<span class="line" id="L338">                        <span class="tok-kw">try</span> self.calldata_args.ensureUnusedCapacity(<span class="tok-number">32</span>);</span>
+<span class="line" id="L339">                        <span class="tok-kw">const</span> i = self.calldata_args.items.len;</span>
+<span class="line" id="L340">                        self.calldata_args.items.len += <span class="tok-number">32</span>;</span>
+<span class="line" id="L341">                        <span class="tok-builtin">@memset</span>(self.calldata_args.items[i..][<span class="tok-number">0</span>..<span class="tok-number">32</span>], <span class="tok-number">0</span>);</span>
+<span class="line" id="L342">                        <span class="tok-kw">if</span> (arg) {</span>
+<span class="line" id="L343">                            self.calldata_args.items[i + <span class="tok-number">31</span>] = <span class="tok-number">1</span>;</span>
+<span class="line" id="L344">                        } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L345">                            self.calldata_args.items[i + <span class="tok-number">31</span>] = <span class="tok-number">0</span>;</span>
+<span class="line" id="L346">                        }</span>
+<span class="line" id="L347">                        <span class="tok-kw">return</span>;</span>
+<span class="line" id="L348">                    },</span>
+<span class="line" id="L349">                    <span class="tok-kw">else</span> =&gt; <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidCoercion,</span>
+<span class="line" id="L350">                }</span>
+<span class="line" id="L351">            },</span>
+<span class="line" id="L352">            .Struct =&gt; |struct_t| {</span>
+<span class="line" id="L353">                _ = struct_t;</span>
+<span class="line" id="L354">                <span class="tok-kw">switch</span> (<span class="tok-builtin">@TypeOf</span>(arg)) {</span>
+<span class="line" id="L355">                    web3.Address =&gt; {</span>
+<span class="line" id="L356">                        <span class="tok-kw">switch</span> (arg_type.*) {</span>
+<span class="line" id="L357">                            .address =&gt; {</span>
+<span class="line" id="L358">                                <span class="tok-kw">try</span> self.calldata_args.ensureUnusedCapacity(<span class="tok-number">32</span>);</span>
+<span class="line" id="L359">                                <span class="tok-kw">const</span> i = self.calldata_args.items.len;</span>
+<span class="line" id="L360">                                self.calldata_args.items.len += <span class="tok-number">32</span>;</span>
+<span class="line" id="L361">                                <span class="tok-builtin">@memset</span>(self.calldata_args.items[i..][<span class="tok-number">0</span>..<span class="tok-number">32</span>], <span class="tok-number">0</span>);</span>
+<span class="line" id="L362">                                <span class="tok-builtin">@memcpy</span>(self.calldata_args.items[i + <span class="tok-number">12</span> ..][<span class="tok-number">0</span>..<span class="tok-number">20</span>], arg.raw[<span class="tok-number">0</span>..<span class="tok-number">20</span>]);</span>
+<span class="line" id="L363">                                <span class="tok-kw">return</span>;</span>
+<span class="line" id="L364">                            },</span>
+<span class="line" id="L365">                            <span class="tok-kw">else</span> =&gt; <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidCoercion,</span>
+<span class="line" id="L366">                        }</span>
+<span class="line" id="L367">                    },</span>
+<span class="line" id="L368">                    <span class="tok-kw">else</span> =&gt; {</span>
+<span class="line" id="L369">                        <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidCoercion;</span>
+<span class="line" id="L370">                    },</span>
+<span class="line" id="L371">                }</span>
+<span class="line" id="L372">            },</span>
+<span class="line" id="L373">            <span class="tok-kw">else</span> =&gt; <span class="tok-kw">unreachable</span>,</span>
+<span class="line" id="L374">        }</span>
+<span class="line" id="L375">    }</span>
+<span class="line" id="L376"></span>
+<span class="line" id="L377">    <span class="tok-comment">/// Returns the total size in bytes of the encoded calldata</span></span>
+<span class="line" id="L378">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">size</span>(self: *<span class="tok-kw">const</span> Self) <span class="tok-type">usize</span> {</span>
+<span class="line" id="L379">        <span class="tok-kw">return</span> self.calldata_args.items.len + self.calldata_extra.items.len;</span>
+<span class="line" id="L380">    }</span>
+<span class="line" id="L381"></span>
+<span class="line" id="L382">    <span class="tok-comment">/// Allocates memory for, then writes the encoded values and returns the result</span></span>
+<span class="line" id="L383">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">encodeAlloc</span>(self: *<span class="tok-kw">const</span> Self) ![]<span class="tok-type">u8</span> {</span>
+<span class="line" id="L384">        <span class="tok-kw">const</span> total_size = self.size();</span>
+<span class="line" id="L385">        <span class="tok-kw">var</span> buffer = <span class="tok-kw">try</span> self.calldata_args.allocator.alloc(<span class="tok-type">u8</span>, total_size);</span>
+<span class="line" id="L386">        _ = <span class="tok-kw">try</span> self.encodeBuf(buffer);</span>
+<span class="line" id="L387">        <span class="tok-kw">return</span> buffer;</span>
+<span class="line" id="L388">    }</span>
+<span class="line" id="L389"></span>
+<span class="line" id="L390">    <span class="tok-comment">/// Encodes the values into the supplied buffer</span></span>
+<span class="line" id="L391">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">encodeBuf</span>(self: *<span class="tok-kw">const</span> Self, buffer: []<span class="tok-type">u8</span>) !<span class="tok-type">usize</span> {</span>
+<span class="line" id="L392">        <span class="tok-kw">const</span> total_size = self.size();</span>
+<span class="line" id="L393"></span>
+<span class="line" id="L394">        <span class="tok-kw">if</span> (buffer.len &lt; total_size) {</span>
+<span class="line" id="L395">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.BufferOverflow;</span>
+<span class="line" id="L396">        }</span>
+<span class="line" id="L397"></span>
+<span class="line" id="L398">        <span class="tok-builtin">@memcpy</span>(buffer[<span class="tok-number">0</span>..self.calldata_args.items.len], self.calldata_args.items);</span>
+<span class="line" id="L399">        <span class="tok-builtin">@memcpy</span>(buffer[self.calldata_args.items.len..][<span class="tok-number">0</span>..self.calldata_extra.items.len], self.calldata_extra.items);</span>
+<span class="line" id="L400"></span>
+<span class="line" id="L401">        <span class="tok-kw">return</span> total_size;</span>
+<span class="line" id="L402">    }</span>
+<span class="line" id="L403">};</span>
+<span class="line" id="L404"></span>
+<span class="line" id="L405"><span class="tok-comment">/// Parses a JSON string into an Abi</span></span>
+<span class="line" id="L406"><span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">parseJson</span>(allocator: std.mem.Allocator, abi: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !Abi {</span>
+<span class="line" id="L407">    <span class="tok-kw">var</span> arena = parser_allocator.ArenaAllocator.init(allocator);</span>
+<span class="line" id="L408">    <span class="tok-kw">errdefer</span> arena.deinit();</span>
+<span class="line" id="L409">    <span class="tok-kw">var</span> parent_allocator = arena.allocator();</span>
+<span class="line" id="L410"></span>
+<span class="line" id="L411">    <span class="tok-kw">var</span> ptr = abi;</span>
+<span class="line" id="L412">    <span class="tok-kw">const</span> result = <span class="tok-kw">try</span> web3.json.JsonReader.parse(parent_allocator, &amp;ptr, []JsonAbiEntry);</span>
+<span class="line" id="L413">    <span class="tok-kw">const</span> entries = <span class="tok-builtin">@as</span>(*<span class="tok-kw">const</span> []AbiEntry, <span class="tok-builtin">@ptrCast</span>(&amp;result)).*;</span>
+<span class="line" id="L414"></span>
+<span class="line" id="L415">    arena.freeList();</span>
+<span class="line" id="L416"></span>
+<span class="line" id="L417">    <span class="tok-kw">return</span> Abi{</span>
+<span class="line" id="L418">        .entries = entries,</span>
+<span class="line" id="L419">    };</span>
+<span class="line" id="L420">}</span>
+<span class="line" id="L421"></span>
+<span class="line" id="L422"><span class="tok-comment">/// Decodes a given type from the supplied ABI encoded data.</span></span>
+<span class="line" id="L423"><span class="tok-comment">/// `offset` is the offset in bytes of the argument (should be divisible by 32).</span></span>
+<span class="line" id="L424"><span class="tok-comment">/// `arg_type` is the ABI type of the argument.</span></span>
+<span class="line" id="L425"><span class="tok-comment">/// `T` is the type to coerce the data into.</span></span>
+<span class="line" id="L426"><span class="tok-comment">/// Errors if data does not match expected format or if coercion to given type is not possible.</span></span>
+<span class="line" id="L427"><span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">decodeArg</span>(allocator: std.mem.Allocator, buffer: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, offset: <span class="tok-type">usize</span>, arg_type: *<span class="tok-kw">const</span> web3.AbiType, <span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>) !T {</span>
+<span class="line" id="L428">    <span class="tok-kw">const</span> TI = <span class="tok-builtin">@typeInfo</span>(T);</span>
+<span class="line" id="L429"></span>
+<span class="line" id="L430">    <span class="tok-kw">if</span> (offset &gt;= buffer.len) {</span>
+<span class="line" id="L431">        <span class="tok-kw">return</span> <span class="tok-kw">error</span>.BufferOverflow;</span>
+<span class="line" id="L432">    }</span>
+<span class="line" id="L433"></span>
+<span class="line" id="L434">    <span class="tok-kw">switch</span> (TI) {</span>
+<span class="line" id="L435">        .Int =&gt; |int_t| {</span>
+<span class="line" id="L436">            <span class="tok-kw">switch</span> (int_t.signedness) {</span>
+<span class="line" id="L437">                .unsigned =&gt; {</span>
+<span class="line" id="L438">                    <span class="tok-kw">switch</span> (arg_type.*) {</span>
+<span class="line" id="L439">                        .uint =&gt; |uint| {</span>
+<span class="line" id="L440">                            <span class="tok-kw">const</span> arg_u256 = std.mem.readIntBig(<span class="tok-type">u256</span>, buffer[offset..][<span class="tok-number">0</span>..<span class="tok-number">32</span>]);</span>
+<span class="line" id="L441">                            <span class="tok-kw">if</span> (uint.bits &lt; <span class="tok-number">256</span>) {</span>
+<span class="line" id="L442">                                <span class="tok-kw">const</span> max_value: <span class="tok-type">u256</span> = std.math.pow(<span class="tok-type">u256</span>, <span class="tok-number">2</span>, uint.bits) - <span class="tok-number">1</span>;</span>
+<span class="line" id="L443">                                <span class="tok-kw">if</span> (arg_u256 &gt; max_value) {</span>
+<span class="line" id="L444">                                    <span class="tok-kw">return</span> <span class="tok-kw">error</span>.IntegerOverflow;</span>
+<span class="line" id="L445">                                }</span>
+<span class="line" id="L446">                            }</span>
+<span class="line" id="L447">                            <span class="tok-kw">return</span> <span class="tok-builtin">@intCast</span>(arg_u256);</span>
+<span class="line" id="L448">                        },</span>
+<span class="line" id="L449">                        <span class="tok-kw">else</span> =&gt; <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidCoercion,</span>
+<span class="line" id="L450">                    }</span>
+<span class="line" id="L451">                },</span>
+<span class="line" id="L452">                .signed =&gt; {</span>
+<span class="line" id="L453">                    <span class="tok-kw">switch</span> (arg_type.*) {</span>
+<span class="line" id="L454">                        .int =&gt; |int| {</span>
+<span class="line" id="L455">                            <span class="tok-kw">const</span> arg_i256 = std.mem.readIntBig(<span class="tok-type">i256</span>, buffer[offset..][<span class="tok-number">0</span>..<span class="tok-number">32</span>]);</span>
+<span class="line" id="L456">                            <span class="tok-kw">if</span> (int.bits &lt; <span class="tok-number">256</span>) {</span>
+<span class="line" id="L457">                                <span class="tok-kw">const</span> max_value: <span class="tok-type">u256</span> = std.math.pow(<span class="tok-type">i256</span>, <span class="tok-number">2</span>, int.bits) - <span class="tok-number">1</span>;</span>
+<span class="line" id="L458">                                <span class="tok-kw">if</span> (arg_i256 &gt; max_value) {</span>
+<span class="line" id="L459">                                    <span class="tok-kw">return</span> <span class="tok-kw">error</span>.IntegerOverflow;</span>
+<span class="line" id="L460">                                }</span>
+<span class="line" id="L461">                                <span class="tok-kw">const</span> min_value: <span class="tok-type">i256</span> = -<span class="tok-builtin">@as</span>(<span class="tok-type">i256</span>, <span class="tok-builtin">@intCast</span>(max_value)) - <span class="tok-number">1</span>;</span>
+<span class="line" id="L462">                                <span class="tok-kw">if</span> (arg_i256 &lt; min_value) {</span>
+<span class="line" id="L463">                                    <span class="tok-kw">return</span> <span class="tok-kw">error</span>.IntegerUnderflow;</span>
+<span class="line" id="L464">                                }</span>
+<span class="line" id="L465">                            }</span>
+<span class="line" id="L466">                            <span class="tok-kw">return</span> <span class="tok-builtin">@intCast</span>(arg_i256);</span>
+<span class="line" id="L467">                        },</span>
+<span class="line" id="L468">                        <span class="tok-kw">else</span> =&gt; <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidCoercion,</span>
+<span class="line" id="L469">                    }</span>
+<span class="line" id="L470">                },</span>
+<span class="line" id="L471">            }</span>
+<span class="line" id="L472">        },</span>
+<span class="line" id="L473">        .Struct =&gt; |struct_t| {</span>
+<span class="line" id="L474">            _ = struct_t;</span>
+<span class="line" id="L475">            <span class="tok-kw">if</span> (T == web3.Address) {</span>
+<span class="line" id="L476">                <span class="tok-kw">switch</span> (arg_type.*) {</span>
+<span class="line" id="L477">                    .address =&gt; {</span>
+<span class="line" id="L478">                        <span class="tok-kw">var</span> val: web3.Address = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L479">                        <span class="tok-builtin">@memcpy</span>(&amp;val.raw, buffer[offset + <span class="tok-number">12</span> ..][<span class="tok-number">0</span>..<span class="tok-number">20</span>]);</span>
+<span class="line" id="L480">                        <span class="tok-kw">return</span> val;</span>
+<span class="line" id="L481">                    },</span>
+<span class="line" id="L482">                    <span class="tok-kw">else</span> =&gt; <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidCoercion,</span>
+<span class="line" id="L483">                }</span>
+<span class="line" id="L484">            }</span>
+<span class="line" id="L485">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidCoercion;</span>
+<span class="line" id="L486">        },</span>
+<span class="line" id="L487">        .Bool =&gt; {</span>
+<span class="line" id="L488">            <span class="tok-kw">const</span> arg_u256 = std.mem.readIntBig(<span class="tok-type">u256</span>, buffer[offset..][<span class="tok-number">0</span>..<span class="tok-number">32</span>]);</span>
+<span class="line" id="L489">            <span class="tok-kw">return</span> arg_u256 != <span class="tok-number">0</span>;</span>
+<span class="line" id="L490">        },</span>
+<span class="line" id="L491">        .Array =&gt; |array_t| {</span>
+<span class="line" id="L492">            <span class="tok-kw">switch</span> (arg_type.*) {</span>
+<span class="line" id="L493">                .fixed_array =&gt; |abi_fixed_array_t| {</span>
+<span class="line" id="L494">                    <span class="tok-kw">if</span> (abi_fixed_array_t.size != array_t.len) {</span>
+<span class="line" id="L495">                        <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidCoercion;</span>
+<span class="line" id="L496">                    }</span>
+<span class="line" id="L497"></span>
+<span class="line" id="L498">                    <span class="tok-kw">var</span> data_position: <span class="tok-type">usize</span> = <span class="tok-builtin">@truncate</span>(std.mem.readIntBig(<span class="tok-type">u256</span>, buffer[offset..][<span class="tok-number">0</span>..<span class="tok-number">32</span>]));</span>
+<span class="line" id="L499"></span>
+<span class="line" id="L500">                    <span class="tok-kw">var</span> val: T = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L501"></span>
+<span class="line" id="L502">                    <span class="tok-kw">for</span> (<span class="tok-number">0</span>..array_t.len) |i| {</span>
+<span class="line" id="L503">                        val[i] = <span class="tok-kw">try</span> decodeArg(allocator, buffer, data_position + (i * <span class="tok-number">32</span>), abi_fixed_array_t.child, array_t.child);</span>
+<span class="line" id="L504">                    }</span>
+<span class="line" id="L505"></span>
+<span class="line" id="L506">                    <span class="tok-kw">return</span> val;</span>
+<span class="line" id="L507">                },</span>
+<span class="line" id="L508">                <span class="tok-kw">else</span> =&gt; <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidCoercion,</span>
+<span class="line" id="L509">            }</span>
+<span class="line" id="L510">        },</span>
+<span class="line" id="L511">        <span class="tok-kw">else</span> =&gt; {</span>
+<span class="line" id="L512">            <span class="tok-builtin">@compileError</span>(<span class="tok-str">&quot;Cannot decode type &quot;</span> ++ <span class="tok-builtin">@typeName</span>(T));</span>
+<span class="line" id="L513">        },</span>
+<span class="line" id="L514">    }</span>
+<span class="line" id="L515">}</span>
+<span class="line" id="L516"></span>
+<span class="line" id="L517"><span class="tok-comment">/// Encodes a function signature into the supplied buffer</span></span>
+<span class="line" id="L518"><span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">encodeFunctionSelectorBuf</span>(out_buffer: []<span class="tok-type">u8</span>, method: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, arg_types: []*<span class="tok-kw">const</span> web3.AbiType) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L519">    <span class="tok-comment">// Allocate temporary memory to construct the function sig</span>
+</span>
+<span class="line" id="L520">    <span class="tok-kw">var</span> gpa = std.heap.GeneralPurposeAllocator(.{}){};</span>
+<span class="line" id="L521">    <span class="tok-kw">var</span> allocator = gpa.allocator();</span>
+<span class="line" id="L522">    <span class="tok-kw">var</span> func_sig_buffer = <span class="tok-kw">try</span> std.ArrayList(<span class="tok-type">u8</span>).initCapacity(allocator, <span class="tok-number">1024</span>);</span>
+<span class="line" id="L523">    <span class="tok-kw">defer</span> func_sig_buffer.deinit();</span>
+<span class="line" id="L524"></span>
+<span class="line" id="L525">    <span class="tok-kw">var</span> writer = func_sig_buffer.writer();</span>
+<span class="line" id="L526"></span>
+<span class="line" id="L527">    _ = <span class="tok-kw">try</span> writer.write(method);</span>
+<span class="line" id="L528">    <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">'('</span>);</span>
+<span class="line" id="L529"></span>
+<span class="line" id="L530">    <span class="tok-kw">var</span> first: <span class="tok-type">bool</span> = <span class="tok-null">true</span>;</span>
+<span class="line" id="L531">    <span class="tok-kw">for</span> (arg_types) |arg_type| {</span>
+<span class="line" id="L532">        <span class="tok-kw">if</span> (!first) {</span>
+<span class="line" id="L533">            <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">','</span>);</span>
+<span class="line" id="L534">        }</span>
+<span class="line" id="L535">        first = <span class="tok-null">false</span>;</span>
+<span class="line" id="L536"></span>
+<span class="line" id="L537">        <span class="tok-kw">try</span> writer.print(<span class="tok-str">&quot;{}&quot;</span>, .{arg_type});</span>
+<span class="line" id="L538">    }</span>
+<span class="line" id="L539"></span>
+<span class="line" id="L540">    <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">')'</span>);</span>
+<span class="line" id="L541"></span>
+<span class="line" id="L542">    <span class="tok-kw">var</span> hash_buffer: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L543"></span>
+<span class="line" id="L544">    <span class="tok-comment">// Hash the function sig</span>
+</span>
+<span class="line" id="L545">    std.crypto.hash.sha3.Keccak256.hash(func_sig_buffer.items, &amp;hash_buffer, .{});</span>
+<span class="line" id="L546"></span>
+<span class="line" id="L547">    <span class="tok-comment">// Copy first 4 bytes to the output buffer</span>
+</span>
+<span class="line" id="L548">    <span class="tok-builtin">@memcpy</span>(out_buffer[<span class="tok-number">0</span>..<span class="tok-number">4</span>], hash_buffer[<span class="tok-number">0</span>..<span class="tok-number">4</span>]);</span>
+<span class="line" id="L549">}</span>
+<span class="line" id="L550"></span>
+<span class="line" id="L551"><span class="tok-kw">test</span> <span class="tok-str">&quot;encode&quot;</span> {</span>
+<span class="line" id="L552">    <span class="tok-kw">const</span> allocator = std.testing.allocator;</span>
+<span class="line" id="L553">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
+<span class="line" id="L554"></span>
+<span class="line" id="L555">    <span class="tok-comment">// Boolean</span>
+</span>
+<span class="line" id="L556">    {</span>
+<span class="line" id="L557">        <span class="tok-kw">var</span> encoder = CalldataArgEncoder.init(allocator);</span>
+<span class="line" id="L558">        <span class="tok-kw">defer</span> encoder.deinit();</span>
+<span class="line" id="L559"></span>
+<span class="line" id="L560">        <span class="tok-kw">const</span> abi_type = web3.AbiType{</span>
+<span class="line" id="L561">            .boolean = <span class="tok-type">void</span>{},</span>
+<span class="line" id="L562">        };</span>
+<span class="line" id="L563"></span>
+<span class="line" id="L564">        <span class="tok-kw">try</span> encoder.append(&amp;abi_type, <span class="tok-null">true</span>);</span>
+<span class="line" id="L565">        <span class="tok-kw">try</span> encoder.append(&amp;abi_type, <span class="tok-null">false</span>);</span>
+<span class="line" id="L566"></span>
+<span class="line" id="L567">        <span class="tok-kw">const</span> data = <span class="tok-kw">try</span> encoder.encodeAlloc();</span>
+<span class="line" id="L568">        <span class="tok-kw">defer</span> allocator.free(data);</span>
+<span class="line" id="L569"></span>
+<span class="line" id="L570">        assert(data[<span class="tok-number">31</span>] == <span class="tok-number">1</span>);</span>
+<span class="line" id="L571">        assert(data[<span class="tok-number">32</span> + <span class="tok-number">31</span>] == <span class="tok-number">0</span>);</span>
+<span class="line" id="L572">    }</span>
+<span class="line" id="L573">}</span>
+<span class="line" id="L574"></span>
+<span class="line" id="L575"><span class="tok-kw">test</span> <span class="tok-str">&quot;decode&quot;</span> {</span>
+<span class="line" id="L576">    <span class="tok-kw">const</span> allocator = std.testing.allocator;</span>
+<span class="line" id="L577">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
+<span class="line" id="L578"></span>
+<span class="line" id="L579">    <span class="tok-comment">// Array</span>
+</span>
+<span class="line" id="L580">    {</span>
+<span class="line" id="L581">        <span class="tok-kw">const</span> input = <span class="tok-str">&quot;uint256[3]&quot;</span>;</span>
+<span class="line" id="L582"></span>
+<span class="line" id="L583">        <span class="tok-kw">var</span> typ = <span class="tok-kw">try</span> web3.AbiType.fromStringAlloc(allocator, input);</span>
+<span class="line" id="L584">        <span class="tok-kw">defer</span> typ.deinit(allocator);</span>
+<span class="line" id="L585"></span>
+<span class="line" id="L586">        <span class="tok-kw">const</span> data = <span class="tok-kw">try</span> allocator.alloc(<span class="tok-type">u8</span>, <span class="tok-number">32</span> * <span class="tok-number">4</span>);</span>
+<span class="line" id="L587">        <span class="tok-kw">defer</span> allocator.free(data);</span>
+<span class="line" id="L588"></span>
+<span class="line" id="L589">        <span class="tok-kw">const</span> hex = <span class="tok-str">&quot;0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000003&quot;</span>;</span>
+<span class="line" id="L590">        <span class="tok-kw">const</span> bytes = <span class="tok-kw">try</span> std.fmt.hexToBytes(data, hex);</span>
+<span class="line" id="L591"></span>
+<span class="line" id="L592">        <span class="tok-kw">var</span> output: [<span class="tok-number">3</span>]<span class="tok-type">u256</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L593">        output = <span class="tok-kw">try</span> decodeArg(allocator, bytes, <span class="tok-number">0</span>, typ, <span class="tok-builtin">@TypeOf</span>(output));</span>
+<span class="line" id="L594"></span>
+<span class="line" id="L595">        assert(output[<span class="tok-number">0</span>] == <span class="tok-number">1</span>);</span>
+<span class="line" id="L596">        assert(output[<span class="tok-number">1</span>] == <span class="tok-number">2</span>);</span>
+<span class="line" id="L597">        assert(output[<span class="tok-number">2</span>] == <span class="tok-number">3</span>);</span>
+<span class="line" id="L598">    }</span>
+<span class="line" id="L599"></span>
+<span class="line" id="L600">    <span class="tok-comment">// Boolean</span>
+</span>
+<span class="line" id="L601">    {</span>
+<span class="line" id="L602">        <span class="tok-kw">const</span> input = <span class="tok-str">&quot;bool&quot;</span>;</span>
+<span class="line" id="L603"></span>
+<span class="line" id="L604">        <span class="tok-kw">var</span> typ = <span class="tok-kw">try</span> web3.AbiType.fromStringAlloc(allocator, input);</span>
+<span class="line" id="L605">        <span class="tok-kw">defer</span> typ.deinit(allocator);</span>
+<span class="line" id="L606"></span>
+<span class="line" id="L607">        <span class="tok-kw">const</span> data = <span class="tok-kw">try</span> allocator.alloc(<span class="tok-type">u8</span>, <span class="tok-number">32</span>);</span>
+<span class="line" id="L608">        <span class="tok-kw">defer</span> allocator.free(data);</span>
+<span class="line" id="L609"></span>
+<span class="line" id="L610">        <span class="tok-kw">const</span> hex = <span class="tok-str">&quot;0000000000000000000000000000000000000000000000000000000000000001&quot;</span>;</span>
+<span class="line" id="L611">        <span class="tok-kw">const</span> bytes = <span class="tok-kw">try</span> std.fmt.hexToBytes(data, hex);</span>
+<span class="line" id="L612"></span>
+<span class="line" id="L613">        <span class="tok-kw">var</span> output: <span class="tok-type">bool</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L614">        output = <span class="tok-kw">try</span> decodeArg(allocator, bytes, <span class="tok-number">0</span>, typ, <span class="tok-builtin">@TypeOf</span>(output));</span>
+<span class="line" id="L615"></span>
+<span class="line" id="L616">        assert(output);</span>
+<span class="line" id="L617">    }</span>
+<span class="line" id="L618">}</span>
+<span class="line" id="L619"></span>
+</code></pre></body>
+</html>

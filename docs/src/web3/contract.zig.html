@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">    <title>contract.zig - source view</title>
+    <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAPNJREFUeNpi/P//PwMlgOXHUjly9E0G4hwgZmQiQZMqEK8H4v9QzUEgQSaoADK+zhH9iAGL+C0gDoAaNg9mGLoLfgA1awK9hS9gzgJxA9RQBmQDrgMxJzRMGKE4HYj/Ial5A8QmQLwCJoBsgBYW2+TR1ChDaWt4LOBxKsi/VUh8XiD+gq4IVyzwQAMJBoKwacZlAB8Qf0bi96IZhtOAe1D6LpqaEiz6rmEzQAeIzwGxCJpieFqApo/vQKyJboAaEBsAsSEupwI1MwKjGBTVHOhegMX5UajYRqiBjMgYmj400cVh0XgTiKdC0zhJgJHS7AwQYABm9EAdCKrEfAAAAABJRU5ErkJggg=="/>
+    <style>
+      body{
+        font-family: system-ui, -apple-system, Roboto, "Segoe UI", sans-serif;
+        margin: 0;
+        line-height: 1.5;
+      }
+
+      pre > code {
+        display: block;
+        overflow: auto;
+        line-height: normal;
+        margin: 0em;
+      }
+      .tok-kw {
+          color: #333;
+          font-weight: bold;
+      }
+      .tok-str {
+          color: #d14;
+      }
+      .tok-builtin {
+          color: #005C7A;
+      }
+      .tok-comment {
+          color: #545454;
+          font-style: italic;
+      }
+      .tok-fn {
+          color: #900;
+          font-weight: bold;
+      }
+      .tok-null {
+          color: #005C5C;
+      }
+      .tok-number {
+          color: #005C5C;
+      }
+      .tok-type {
+          color: #458;
+          font-weight: bold;
+      }
+      pre {
+        counter-reset: line;
+      }
+      pre .line:before {
+        counter-increment: line;
+        content: counter(line);
+        display: inline-block;
+        padding-right: 1em;
+        width: 2em;
+        text-align: right;
+        color: #999;
+      }
+      
+      .line {
+        width: 100%;
+        display: inline-block;
+      }
+      .line:target {
+        border-top: 1px solid #ccc;
+        border-bottom: 1px solid #ccc;
+        background: #fafafa;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body{
+            background:#222;
+            color: #ccc;
+        }
+        pre > code {
+            color: #ccc;
+            background: #222;
+            border: unset;
+        }
+        .line:target {
+            border-top: 1px solid #444;
+            border-bottom: 1px solid #444;
+            background: #333;
+        }
+        .tok-kw {
+            color: #eee;
+        }
+        .tok-str {
+            color: #2e5;
+        }
+        .tok-builtin {
+            color: #ff894c;
+        }
+        .tok-comment {
+            color: #aa7;
+        }
+        .tok-fn {
+            color: #B1A0F8;
+        }
+        .tok-null {
+            color: #ff8080;
+        }
+        .tok-number {
+            color: #ff8080;
+        }
+        .tok-type {
+            color: #68f;
+        }
+      }
+    </style>
+</head>
+<body>
+<pre><code><span class="line" id="L1"><span class="tok-kw">const</span> std = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;std&quot;</span>);</span>
+<span class="line" id="L2"></span>
+<span class="line" id="L3"><span class="tok-kw">const</span> web3 = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;web3.zig&quot;</span>);</span>
+<span class="line" id="L4"></span>
+<span class="line" id="L5"><span class="tok-comment">/// Represents the return value of a contract call</span></span>
+<span class="line" id="L6"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> ReturnValues = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L7">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L8"></span>
+<span class="line" id="L9">    abi_entry: *web3.abi.AbiEntry,</span>
+<span class="line" id="L10">    data: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
+<span class="line" id="L11"></span>
+<span class="line" id="L12">    <span class="tok-comment">/// Retreives a value at the given position and attempts to coerce it into the supplied type</span></span>
+<span class="line" id="L13">    <span class="tok-comment">/// Errors if the position supplied is greater than the number of return arguments or coercion fails.</span></span>
+<span class="line" id="L14">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">get</span>(self: *<span class="tok-kw">const</span> Self, allocator: std.mem.Allocator, position: <span class="tok-type">usize</span>, <span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>) !T {</span>
+<span class="line" id="L15">        <span class="tok-kw">if</span> (self.abi_entry.outputs) |outputs| {</span>
+<span class="line" id="L16">            <span class="tok-kw">if</span> (position &gt; outputs.len - <span class="tok-number">1</span>) {</span>
+<span class="line" id="L17">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.Overflow;</span>
+<span class="line" id="L18">            }</span>
+<span class="line" id="L19">            <span class="tok-kw">return</span> web3.abi.decodeArg(allocator, self.data, position * <span class="tok-number">32</span>, outputs[position].<span class="tok-type">type</span>, T);</span>
+<span class="line" id="L20">        }</span>
+<span class="line" id="L21"></span>
+<span class="line" id="L22">        <span class="tok-kw">return</span> <span class="tok-kw">error</span>.Overflow;</span>
+<span class="line" id="L23">    }</span>
+<span class="line" id="L24"></span>
+<span class="line" id="L25">    <span class="tok-comment">/// Retreives a value identified by the given name.</span></span>
+<span class="line" id="L26">    <span class="tok-comment">/// Errors if the ABI entry does not contain a return value with that name or coercion fails.</span></span>
+<span class="line" id="L27">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getNamed</span>(self: *<span class="tok-kw">const</span> Self, allocator: std.mem.Allocator, name: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, <span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>) !T {</span>
+<span class="line" id="L28">        <span class="tok-kw">if</span> (self.abi_entry.outputs) |outputs| {</span>
+<span class="line" id="L29">            <span class="tok-kw">for</span> (outputs, <span class="tok-number">0</span>..) |output, i| {</span>
+<span class="line" id="L30">                <span class="tok-kw">if</span> (output.name) |output_name| {</span>
+<span class="line" id="L31">                    <span class="tok-kw">if</span> (std.mem.eql(<span class="tok-type">u8</span>, output_name, name)) {</span>
+<span class="line" id="L32">                        <span class="tok-kw">return</span> web3.abi.decodeArg(allocator, self.data, i * <span class="tok-number">32</span>, output.<span class="tok-type">type</span>, T);</span>
+<span class="line" id="L33">                    }</span>
+<span class="line" id="L34">                }</span>
+<span class="line" id="L35">            }</span>
+<span class="line" id="L36"></span>
+<span class="line" id="L37">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.NotFound;</span>
+<span class="line" id="L38">        }</span>
+<span class="line" id="L39"></span>
+<span class="line" id="L40">        <span class="tok-kw">return</span> <span class="tok-kw">error</span>.NotFound;</span>
+<span class="line" id="L41">    }</span>
+<span class="line" id="L42">};</span>
+<span class="line" id="L43"></span>
+<span class="line" id="L44"><span class="tok-comment">/// Abstraction around Ethereum contracts (incomplete)</span></span>
+<span class="line" id="L45"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> Contract = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L46">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L47"></span>
+<span class="line" id="L48">    <span class="tok-kw">pub</span> <span class="tok-kw">const</span> CallOptions = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L49">        from: web3.Address,</span>
+<span class="line" id="L50">        value: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L51">        gas: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L52">        block_tag: ?web3.BlockTag = <span class="tok-null">null</span>,</span>
+<span class="line" id="L53">        tx_type: <span class="tok-kw">union</span>(<span class="tok-kw">enum</span>) {</span>
+<span class="line" id="L54">            legacy: <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L55">                gas_price: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L56">            },</span>
+<span class="line" id="L57">            eip1559: <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L58">                max_priority_fee_per_gas: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L59">                max_fee_per_gas: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L60">            },</span>
+<span class="line" id="L61">        } = .{ .eip1559 = .{} },</span>
+<span class="line" id="L62">    };</span>
+<span class="line" id="L63"></span>
+<span class="line" id="L64">    allocator: std.mem.Allocator,</span>
+<span class="line" id="L65">    abi: web3.abi.Abi,</span>
+<span class="line" id="L66">    address: web3.Address,</span>
+<span class="line" id="L67">    provider: web3.Provider,</span>
+<span class="line" id="L68"></span>
+<span class="line" id="L69">    <span class="tok-comment">/// Intializes a new contract</span></span>
+<span class="line" id="L70">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">init</span>(allocator: std.mem.Allocator, address: web3.Address, contract_abi: web3.abi.Abi, provider: web3.Provider) Self {</span>
+<span class="line" id="L71">        <span class="tok-kw">return</span> Self{</span>
+<span class="line" id="L72">            .allocator = allocator,</span>
+<span class="line" id="L73">            .address = address,</span>
+<span class="line" id="L74">            .abi = contract_abi,</span>
+<span class="line" id="L75">            .provider = provider,</span>
+<span class="line" id="L76">        };</span>
+<span class="line" id="L77">    }</span>
+<span class="line" id="L78"></span>
+<span class="line" id="L79">    <span class="tok-comment">/// Calls the supplied method on the contract with the given args.</span></span>
+<span class="line" id="L80">    <span class="tok-comment">/// If multiple methods exist with the same name, the first one in the ABI is used.</span></span>
+<span class="line" id="L81">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">call</span>(self: *<span class="tok-kw">const</span> Self, method: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, args: <span class="tok-kw">anytype</span>, opts: CallOptions) !ReturnValues {</span>
+<span class="line" id="L82">        <span class="tok-kw">const</span> entry = <span class="tok-kw">try</span> self.abi.findFirstEntry(method);</span>
+<span class="line" id="L83"></span>
+<span class="line" id="L84">        <span class="tok-kw">if</span> (entry == <span class="tok-null">null</span>) {</span>
+<span class="line" id="L85">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.NoMatchingMethod;</span>
+<span class="line" id="L86">        }</span>
+<span class="line" id="L87"></span>
+<span class="line" id="L88">        <span class="tok-kw">return</span> self.callEntry(entry.?, args, opts);</span>
+<span class="line" id="L89">    }</span>
+<span class="line" id="L90"></span>
+<span class="line" id="L91">    <span class="tok-comment">/// Finds a method with matching name and args and calls it on the contract</span></span>
+<span class="line" id="L92">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">callOverloaded</span>(self: *<span class="tok-kw">const</span> Self, method: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, arg_types: []<span class="tok-kw">const</span> web3.AbiType, args: <span class="tok-kw">anytype</span>, opts: CallOptions) !ReturnValues {</span>
+<span class="line" id="L93">        std.debug.assert(arg_types.len == args.len);</span>
+<span class="line" id="L94">        <span class="tok-kw">const</span> entry = <span class="tok-kw">try</span> self.abi.findEntry(method, arg_types);</span>
+<span class="line" id="L95"></span>
+<span class="line" id="L96">        <span class="tok-kw">if</span> (entry == <span class="tok-null">null</span>) {</span>
+<span class="line" id="L97">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.NoMatchingMethod;</span>
+<span class="line" id="L98">        }</span>
+<span class="line" id="L99"></span>
+<span class="line" id="L100">        <span class="tok-kw">return</span> self.callEntry(entry.?, args, opts);</span>
+<span class="line" id="L101">    }</span>
+<span class="line" id="L102"></span>
+<span class="line" id="L103">    <span class="tok-comment">/// Calls a method on the contract identified by the supplied ABI entry.</span></span>
+<span class="line" id="L104">    <span class="tok-comment">/// The caller can use `findEntry` or `findFirstEntry` and pass the result to this method to avoid the lookup each time.</span></span>
+<span class="line" id="L105">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">callEntry</span>(self: *<span class="tok-kw">const</span> Self, entry: *web3.abi.AbiEntry, args: <span class="tok-kw">anytype</span>, opts: CallOptions) !ReturnValues {</span>
+<span class="line" id="L106">        <span class="tok-kw">var</span> encoder = web3.abi.CalldataArgEncoder.init(self.allocator);</span>
+<span class="line" id="L107">        <span class="tok-kw">defer</span> encoder.deinit();</span>
+<span class="line" id="L108"></span>
+<span class="line" id="L109">        <span class="tok-kw">if</span> (entry.inputs) |inputs| {</span>
+<span class="line" id="L110">            <span class="tok-kw">inline</span> <span class="tok-kw">for</span> (inputs, args) |*input, arg| {</span>
+<span class="line" id="L111">                <span class="tok-kw">try</span> encoder.append(input.<span class="tok-type">type</span>, arg);</span>
+<span class="line" id="L112">            }</span>
+<span class="line" id="L113">        }</span>
+<span class="line" id="L114"></span>
+<span class="line" id="L115">        <span class="tok-kw">return</span> self.callInternal(entry, opts, encoder);</span>
+<span class="line" id="L116">    }</span>
+<span class="line" id="L117"></span>
+<span class="line" id="L118">    <span class="tok-kw">fn</span> <span class="tok-fn">callInternal</span>(self: *<span class="tok-kw">const</span> Self, entry: *web3.abi.AbiEntry, opts: CallOptions, encoder: web3.abi.CalldataArgEncoder) !ReturnValues {</span>
+<span class="line" id="L119">        std.debug.assert(entry.name != <span class="tok-null">null</span>);</span>
+<span class="line" id="L120">        std.debug.assert(entry.<span class="tok-type">type</span> == .function);</span>
+<span class="line" id="L121"></span>
+<span class="line" id="L122">        <span class="tok-kw">const</span> arg_size = encoder.size();</span>
+<span class="line" id="L123"></span>
+<span class="line" id="L124">        <span class="tok-kw">var</span> calldata = <span class="tok-kw">try</span> self.allocator.alloc(<span class="tok-type">u8</span>, <span class="tok-number">4</span> + arg_size);</span>
+<span class="line" id="L125">        <span class="tok-kw">defer</span> self.allocator.free(calldata);</span>
+<span class="line" id="L126"></span>
+<span class="line" id="L127">        <span class="tok-kw">const</span> selector = <span class="tok-kw">try</span> entry.computeSelector();</span>
+<span class="line" id="L128">        <span class="tok-builtin">@memcpy</span>(calldata[<span class="tok-number">0</span>..<span class="tok-number">4</span>], &amp;selector);</span>
+<span class="line" id="L129"></span>
+<span class="line" id="L130">        _ = <span class="tok-kw">try</span> encoder.encodeBuf(calldata[<span class="tok-number">4</span>..]);</span>
+<span class="line" id="L131"></span>
+<span class="line" id="L132">        <span class="tok-kw">var</span> result = <span class="tok-kw">switch</span> (opts.tx_type) {</span>
+<span class="line" id="L133">            .eip1559 =&gt; |tx| <span class="tok-kw">try</span> self.provider.call(web3.TransactionRequest{</span>
+<span class="line" id="L134">                .from = opts.from,</span>
+<span class="line" id="L135">                .to = self.address,</span>
+<span class="line" id="L136">                .value = opts.value,</span>
+<span class="line" id="L137">                .data = calldata[<span class="tok-number">0</span> .. <span class="tok-number">4</span> + arg_size],</span>
+<span class="line" id="L138">                .gas = opts.gas,</span>
+<span class="line" id="L139">                .max_fee_per_gas = tx.max_fee_per_gas,</span>
+<span class="line" id="L140">                .max_priority_fee_per_gas = tx.max_priority_fee_per_gas,</span>
+<span class="line" id="L141">            }, opts.block_tag),</span>
+<span class="line" id="L142">            .legacy =&gt; |tx| <span class="tok-kw">try</span> self.provider.call(web3.TransactionRequest{</span>
+<span class="line" id="L143">                .from = opts.from,</span>
+<span class="line" id="L144">                .to = self.address,</span>
+<span class="line" id="L145">                .value = opts.value,</span>
+<span class="line" id="L146">                .data = calldata[<span class="tok-number">0</span> .. <span class="tok-number">4</span> + arg_size],</span>
+<span class="line" id="L147">                .gas = opts.gas,</span>
+<span class="line" id="L148">                .gas_price = tx.gas_price,</span>
+<span class="line" id="L149">            }, opts.block_tag),</span>
+<span class="line" id="L150">        };</span>
+<span class="line" id="L151"></span>
+<span class="line" id="L152">        <span class="tok-kw">return</span> ReturnValues{</span>
+<span class="line" id="L153">            .abi_entry = entry,</span>
+<span class="line" id="L154">            .data = result,</span>
+<span class="line" id="L155">        };</span>
+<span class="line" id="L156">    }</span>
+<span class="line" id="L157">};</span>
+<span class="line" id="L158"></span>
+<span class="line" id="L159"><span class="tok-comment">/// A dynamically dispatched provider for performing functions required by the contract abstraction</span></span>
+<span class="line" id="L160"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> Provider = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L161">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L162"></span>
+<span class="line" id="L163">    <span class="tok-comment">// The type erased pointer to the allocator implementation</span>
+</span>
+<span class="line" id="L164">    ptr: *<span class="tok-type">anyopaque</span>,</span>
+<span class="line" id="L165">    vtable: *<span class="tok-kw">const</span> VTable,</span>
+<span class="line" id="L166"></span>
+<span class="line" id="L167">    <span class="tok-kw">pub</span> <span class="tok-kw">const</span> VTable = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L168">        call: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) <span class="tok-type">anyerror</span>![]<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
+<span class="line" id="L169">    };</span>
+<span class="line" id="L170"></span>
+<span class="line" id="L171">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">call</span>(self: Self, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
+<span class="line" id="L172">        <span class="tok-kw">return</span> self.vtable.call(self.ptr, tx, block_tag);</span>
+<span class="line" id="L173">    }</span>
+<span class="line" id="L174">};</span>
+<span class="line" id="L175"></span>
+</code></pre></body>
+</html>

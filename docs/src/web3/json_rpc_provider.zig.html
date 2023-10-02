@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">    <title>json_rpc_provider.zig - source view</title>
+    <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAPNJREFUeNpi/P//PwMlgOXHUjly9E0G4hwgZmQiQZMqEK8H4v9QzUEgQSaoADK+zhH9iAGL+C0gDoAaNg9mGLoLfgA1awK9hS9gzgJxA9RQBmQDrgMxJzRMGKE4HYj/Ial5A8QmQLwCJoBsgBYW2+TR1ChDaWt4LOBxKsi/VUh8XiD+gq4IVyzwQAMJBoKwacZlAB8Qf0bi96IZhtOAe1D6LpqaEiz6rmEzQAeIzwGxCJpieFqApo/vQKyJboAaEBsAsSEupwI1MwKjGBTVHOhegMX5UajYRqiBjMgYmj400cVh0XgTiKdC0zhJgJHS7AwQYABm9EAdCKrEfAAAAABJRU5ErkJggg=="/>
+    <style>
+      body{
+        font-family: system-ui, -apple-system, Roboto, "Segoe UI", sans-serif;
+        margin: 0;
+        line-height: 1.5;
+      }
+
+      pre > code {
+        display: block;
+        overflow: auto;
+        line-height: normal;
+        margin: 0em;
+      }
+      .tok-kw {
+          color: #333;
+          font-weight: bold;
+      }
+      .tok-str {
+          color: #d14;
+      }
+      .tok-builtin {
+          color: #005C7A;
+      }
+      .tok-comment {
+          color: #545454;
+          font-style: italic;
+      }
+      .tok-fn {
+          color: #900;
+          font-weight: bold;
+      }
+      .tok-null {
+          color: #005C5C;
+      }
+      .tok-number {
+          color: #005C5C;
+      }
+      .tok-type {
+          color: #458;
+          font-weight: bold;
+      }
+      pre {
+        counter-reset: line;
+      }
+      pre .line:before {
+        counter-increment: line;
+        content: counter(line);
+        display: inline-block;
+        padding-right: 1em;
+        width: 2em;
+        text-align: right;
+        color: #999;
+      }
+      
+      .line {
+        width: 100%;
+        display: inline-block;
+      }
+      .line:target {
+        border-top: 1px solid #ccc;
+        border-bottom: 1px solid #ccc;
+        background: #fafafa;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body{
+            background:#222;
+            color: #ccc;
+        }
+        pre > code {
+            color: #ccc;
+            background: #222;
+            border: unset;
+        }
+        .line:target {
+            border-top: 1px solid #444;
+            border-bottom: 1px solid #444;
+            background: #333;
+        }
+        .tok-kw {
+            color: #eee;
+        }
+        .tok-str {
+            color: #2e5;
+        }
+        .tok-builtin {
+            color: #ff894c;
+        }
+        .tok-comment {
+            color: #aa7;
+        }
+        .tok-fn {
+            color: #B1A0F8;
+        }
+        .tok-null {
+            color: #ff8080;
+        }
+        .tok-number {
+            color: #ff8080;
+        }
+        .tok-type {
+            color: #68f;
+        }
+      }
+    </style>
+</head>
+<body>
+<pre><code><span class="line" id="L1"><span class="tok-kw">const</span> std = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;std&quot;</span>);</span>
+<span class="line" id="L2"></span>
+<span class="line" id="L3"><span class="tok-kw">const</span> web3 = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;web3.zig&quot;</span>);</span>
+<span class="line" id="L4"></span>
+<span class="line" id="L5"><span class="tok-kw">const</span> parser_allocator = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;parser_allocator.zig&quot;</span>);</span>
+<span class="line" id="L6"></span>
+<span class="line" id="L7"><span class="tok-kw">const</span> INITIAL_RESPONSE_BUFFER_SIZE = <span class="tok-number">1024</span>;</span>
+<span class="line" id="L8"><span class="tok-kw">const</span> MAX_RESPONSE_BUFFER_SIZE = <span class="tok-number">1024</span> * <span class="tok-number">1024</span>;</span>
+<span class="line" id="L9"></span>
+<span class="line" id="L10"><span class="tok-kw">var</span> latest = web3.String.wrap(<span class="tok-str">&quot;latest&quot;</span>);</span>
+<span class="line" id="L11"></span>
+<span class="line" id="L12"><span class="tok-kw">fn</span> <span class="tok-fn">JsonRpcResponse</span>(<span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>) <span class="tok-type">type</span> {</span>
+<span class="line" id="L13">    <span class="tok-kw">return</span> <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L14">        <span class="tok-comment">// id: u32,</span>
+</span>
+<span class="line" id="L15">        <span class="tok-comment">// jsonrpc: []const u8,</span>
+</span>
+<span class="line" id="L16">        result: T,</span>
+<span class="line" id="L17">    };</span>
+<span class="line" id="L18">}</span>
+<span class="line" id="L19"></span>
+<span class="line" id="L20"><span class="tok-kw">const</span> JsonRpcError = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L21">    <span class="tok-comment">// id: u32,</span>
+</span>
+<span class="line" id="L22">    <span class="tok-comment">// jsonrpc: []const u8,</span>
+</span>
+<span class="line" id="L23">    @&quot;error&quot;: <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L24">        code: <span class="tok-type">i32</span>,</span>
+<span class="line" id="L25">        message: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
+<span class="line" id="L26">    },</span>
+<span class="line" id="L27">};</span>
+<span class="line" id="L28"></span>
+<span class="line" id="L29"><span class="tok-comment">// The following structs are identical versions of the corresponding library type but these</span>
+</span>
+<span class="line" id="L30"><span class="tok-comment">// structs us the naming convention of the API (i.e. camelCase) so that the parser, which</span>
+</span>
+<span class="line" id="L31"><span class="tok-comment">// uses comptime reflection, can parse them correctly</span>
+</span>
+<span class="line" id="L32"></span>
+<span class="line" id="L33"><span class="tok-comment">// Note: This struct must be identical to `web3.TransactionRequest`</span>
+</span>
+<span class="line" id="L34"><span class="tok-kw">const</span> JsonTransactionRequest = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L35">    from: web3.Address,</span>
+<span class="line" id="L36">    to: ?web3.Address = <span class="tok-null">null</span>,</span>
+<span class="line" id="L37">    gas: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L38">    gasPrice: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L39">    maxPriorityFeePerGas: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L40">    maxFeePerGas: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L41">    value: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L42">    data: ?[]<span class="tok-kw">const</span> <span class="tok-type">u8</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L43">};</span>
+<span class="line" id="L44"></span>
+<span class="line" id="L45"><span class="tok-comment">// Note: This struct must be identical to `web3.Transaction`</span>
+</span>
+<span class="line" id="L46"><span class="tok-kw">const</span> JsonTransaction = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L47">    blockHash: ?web3.Hash,</span>
+<span class="line" id="L48">    blockNumber: ?<span class="tok-type">u64</span>,</span>
+<span class="line" id="L49">    from: web3.Address,</span>
+<span class="line" id="L50">    gas: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L51">    gasPrice: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L52">    maxPriorityFeePerGas: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L53">    maxFeePerGas: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L54">    hash: web3.Hash,</span>
+<span class="line" id="L55">    input: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
+<span class="line" id="L56">    to: web3.Address,</span>
+<span class="line" id="L57">    transactionIndex: <span class="tok-type">u32</span>,</span>
+<span class="line" id="L58">    value: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L59">    v: <span class="tok-type">u8</span>,</span>
+<span class="line" id="L60">    r: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L61">    s: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L62">};</span>
+<span class="line" id="L63"></span>
+<span class="line" id="L64"><span class="tok-comment">// Note: This struct must be identical to `web3.Log`</span>
+</span>
+<span class="line" id="L65"><span class="tok-kw">const</span> JsonLog = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L66">    removed: <span class="tok-type">bool</span>,</span>
+<span class="line" id="L67">    logIndex: ?<span class="tok-type">u32</span>,</span>
+<span class="line" id="L68">    transactionIndex: ?<span class="tok-type">u32</span>,</span>
+<span class="line" id="L69">    transactionHash: ?web3.Hash,</span>
+<span class="line" id="L70">    blockHash: ?web3.Hash,</span>
+<span class="line" id="L71">    blockNumber: ?<span class="tok-type">u64</span>,</span>
+<span class="line" id="L72">    address: web3.Address,</span>
+<span class="line" id="L73">    data: web3.DataHexString,</span>
+<span class="line" id="L74">    topics: []web3.Hash,</span>
+<span class="line" id="L75">};</span>
+<span class="line" id="L76"></span>
+<span class="line" id="L77"><span class="tok-comment">// Note: This struct must be identical to `web3.Logs`</span>
+</span>
+<span class="line" id="L78"><span class="tok-kw">const</span> JsonLogs = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L79">    raw: []JsonLog,</span>
+<span class="line" id="L80"></span>
+<span class="line" id="L81">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">fromJson</span>(allocator: std.mem.Allocator, buffer: *[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !JsonLogs {</span>
+<span class="line" id="L82">        <span class="tok-kw">return</span> JsonLogs{</span>
+<span class="line" id="L83">            .raw = <span class="tok-kw">try</span> web3.json.JsonReader.parse(allocator, buffer, []JsonLog),</span>
+<span class="line" id="L84">        };</span>
+<span class="line" id="L85">    }</span>
+<span class="line" id="L86">};</span>
+<span class="line" id="L87"></span>
+<span class="line" id="L88"><span class="tok-comment">// Note: This struct must be identical to `web3.TransactionReceipt`</span>
+</span>
+<span class="line" id="L89"><span class="tok-kw">const</span> JsonTransactionReceipt = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L90">    transactionHash: web3.Hash,</span>
+<span class="line" id="L91">    transactionIndex: <span class="tok-type">u32</span>,</span>
+<span class="line" id="L92">    blockHash: web3.Hash,</span>
+<span class="line" id="L93">    blockNumber: <span class="tok-type">u64</span>,</span>
+<span class="line" id="L94">    from: web3.Address,</span>
+<span class="line" id="L95">    to: web3.Address,</span>
+<span class="line" id="L96">    cumulativeGasUsed: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L97">    effectiveGasPrice: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L98">    gasUsed: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L99">    contractAddress: ?web3.Address,</span>
+<span class="line" id="L100">    logs: []JsonLog,</span>
+<span class="line" id="L101">    logsBloom: web3.FixedDataHexString(<span class="tok-number">256</span>),</span>
+<span class="line" id="L102">    <span class="tok-type">type</span>: <span class="tok-type">u8</span>,</span>
+<span class="line" id="L103">    status: <span class="tok-type">u8</span>,</span>
+<span class="line" id="L104">};</span>
+<span class="line" id="L105"></span>
+<span class="line" id="L106"><span class="tok-comment">// Note: This struct must be identical to `web3.Block`</span>
+</span>
+<span class="line" id="L107"><span class="tok-kw">fn</span> <span class="tok-fn">JsonBlock</span>(<span class="tok-kw">comptime</span> full_transactions: <span class="tok-type">bool</span>) <span class="tok-type">type</span> {</span>
+<span class="line" id="L108">    <span class="tok-kw">const</span> TransactionType = <span class="tok-kw">if</span> (full_transactions) JsonTransaction <span class="tok-kw">else</span> web3.Hash;</span>
+<span class="line" id="L109"></span>
+<span class="line" id="L110">    <span class="tok-kw">return</span> <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L111">        <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L112"></span>
+<span class="line" id="L113">        difficulty: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L114">        extraData: web3.DataHexString,</span>
+<span class="line" id="L115">        gasLimit: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L116">        gasUsed: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L117">        hash: ?web3.Hash,</span>
+<span class="line" id="L118">        logsBloom: web3.FixedDataHexString(<span class="tok-number">256</span>),</span>
+<span class="line" id="L119">        miner: web3.Address,</span>
+<span class="line" id="L120">        mixHash: web3.Hash,</span>
+<span class="line" id="L121">        nonce: ?web3.FixedDataHexString(<span class="tok-number">8</span>),</span>
+<span class="line" id="L122">        number: ?<span class="tok-type">u64</span>,</span>
+<span class="line" id="L123">        parentHash: web3.Hash,</span>
+<span class="line" id="L124">        receiptsRoot: web3.Hash,</span>
+<span class="line" id="L125">        sha3Uncles: web3.Hash,</span>
+<span class="line" id="L126">        size: <span class="tok-type">u64</span>,</span>
+<span class="line" id="L127">        stateRoot: web3.Hash,</span>
+<span class="line" id="L128">        timestamp: <span class="tok-type">u64</span>,</span>
+<span class="line" id="L129">        totalDifficulty: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L130">        transactionsRoot: web3.Hash,</span>
+<span class="line" id="L131">        withdrawalsRoot: web3.Hash,</span>
+<span class="line" id="L132">        transactions: []TransactionType,</span>
+<span class="line" id="L133">        uncles: []web3.Hash,</span>
+<span class="line" id="L134">        withdrawals: []<span class="tok-kw">struct</span> {</span>
+<span class="line" id="L135">            index: <span class="tok-type">u64</span>,</span>
+<span class="line" id="L136">            validatorIndex: <span class="tok-type">u64</span>,</span>
+<span class="line" id="L137">            address: web3.Address,</span>
+<span class="line" id="L138">            amount: <span class="tok-type">u64</span>,</span>
+<span class="line" id="L139">        },</span>
+<span class="line" id="L140">    };</span>
+<span class="line" id="L141">}</span>
+<span class="line" id="L142"></span>
+<span class="line" id="L143"><span class="tok-comment">// Note: This struct must be identical to `web3.SyncData`</span>
+</span>
+<span class="line" id="L144"><span class="tok-kw">const</span> JsonSyncData = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L145">    startingBlock: ?<span class="tok-type">u64</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L146">    currentBlock: ?<span class="tok-type">u64</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L147">    highestBlock: ?<span class="tok-type">u64</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L148">};</span>
+<span class="line" id="L149"></span>
+<span class="line" id="L150"><span class="tok-comment">// Note: This struct must be identical to `web3.SyncStatus`</span>
+</span>
+<span class="line" id="L151"><span class="tok-kw">const</span> JsonSyncStatus = <span class="tok-kw">union</span>(<span class="tok-kw">enum</span>) {</span>
+<span class="line" id="L152">    not_syncing: <span class="tok-type">void</span>,</span>
+<span class="line" id="L153">    syncing: JsonSyncData,</span>
+<span class="line" id="L154"></span>
+<span class="line" id="L155">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">fromJson</span>(allocator: std.mem.Allocator, buffer: *[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !JsonSyncStatus {</span>
+<span class="line" id="L156">        <span class="tok-kw">if</span> (buffer.len &gt;= <span class="tok-str">&quot;false&quot;</span>.len <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, buffer.*[<span class="tok-number">0</span>..<span class="tok-str">&quot;false&quot;</span>.len], <span class="tok-str">&quot;false&quot;</span>)) {</span>
+<span class="line" id="L157">            buffer.* = buffer.*[<span class="tok-str">&quot;false&quot;</span>.len..];</span>
+<span class="line" id="L158">            <span class="tok-kw">return</span> JsonSyncStatus{ .not_syncing = <span class="tok-type">void</span>{} };</span>
+<span class="line" id="L159">        } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L160">            <span class="tok-kw">const</span> data = <span class="tok-kw">try</span> web3.json.JsonReader.parse(allocator, buffer, JsonSyncData);</span>
+<span class="line" id="L161">            <span class="tok-kw">return</span> JsonSyncStatus{</span>
+<span class="line" id="L162">                .syncing = data,</span>
+<span class="line" id="L163">            };</span>
+<span class="line" id="L164">        }</span>
+<span class="line" id="L165">    }</span>
+<span class="line" id="L166">};</span>
+<span class="line" id="L167"></span>
+<span class="line" id="L168"><span class="tok-kw">comptime</span> {</span>
+<span class="line" id="L169">    <span class="tok-comment">// Not a perfect comparison but can catch mistakes early</span>
+</span>
+<span class="line" id="L170">    std.debug.assert(<span class="tok-builtin">@sizeOf</span>(JsonTransactionRequest) == <span class="tok-builtin">@sizeOf</span>(web3.TransactionRequest));</span>
+<span class="line" id="L171">    std.debug.assert(<span class="tok-builtin">@typeInfo</span>(JsonTransactionRequest).Struct.fields.len == <span class="tok-builtin">@typeInfo</span>(web3.TransactionRequest).Struct.fields.len);</span>
+<span class="line" id="L172">    std.debug.assert(<span class="tok-builtin">@sizeOf</span>(JsonTransaction) == <span class="tok-builtin">@sizeOf</span>(web3.Transaction));</span>
+<span class="line" id="L173">    std.debug.assert(<span class="tok-builtin">@typeInfo</span>(JsonTransaction).Struct.fields.len == <span class="tok-builtin">@typeInfo</span>(web3.Transaction).Struct.fields.len);</span>
+<span class="line" id="L174">    std.debug.assert(<span class="tok-builtin">@sizeOf</span>(JsonLog) == <span class="tok-builtin">@sizeOf</span>(web3.Log));</span>
+<span class="line" id="L175">    std.debug.assert(<span class="tok-builtin">@typeInfo</span>(JsonLog).Struct.fields.len == <span class="tok-builtin">@typeInfo</span>(web3.Log).Struct.fields.len);</span>
+<span class="line" id="L176">    std.debug.assert(<span class="tok-builtin">@sizeOf</span>(JsonLogs) == <span class="tok-builtin">@sizeOf</span>(web3.Logs));</span>
+<span class="line" id="L177">    std.debug.assert(<span class="tok-builtin">@typeInfo</span>(JsonLogs).Struct.fields.len == <span class="tok-builtin">@typeInfo</span>(web3.Logs).Struct.fields.len);</span>
+<span class="line" id="L178">    std.debug.assert(<span class="tok-builtin">@sizeOf</span>(JsonTransactionReceipt) == <span class="tok-builtin">@sizeOf</span>(web3.TransactionReceipt));</span>
+<span class="line" id="L179">    std.debug.assert(<span class="tok-builtin">@typeInfo</span>(JsonTransactionReceipt).Struct.fields.len == <span class="tok-builtin">@typeInfo</span>(web3.TransactionReceipt).Struct.fields.len);</span>
+<span class="line" id="L180">    std.debug.assert(<span class="tok-builtin">@sizeOf</span>(JsonSyncData) == <span class="tok-builtin">@sizeOf</span>(web3.SyncData));</span>
+<span class="line" id="L181">    std.debug.assert(<span class="tok-builtin">@typeInfo</span>(JsonSyncData).Struct.fields.len == <span class="tok-builtin">@typeInfo</span>(web3.SyncData).Struct.fields.len);</span>
+<span class="line" id="L182">    std.debug.assert(<span class="tok-builtin">@sizeOf</span>(JsonSyncStatus) == <span class="tok-builtin">@sizeOf</span>(web3.SyncStatus));</span>
+<span class="line" id="L183">    std.debug.assert(<span class="tok-builtin">@typeInfo</span>(JsonSyncStatus).Union.fields.len == <span class="tok-builtin">@typeInfo</span>(web3.SyncStatus).Union.fields.len);</span>
+<span class="line" id="L184">    std.debug.assert(<span class="tok-builtin">@sizeOf</span>(JsonBlock(<span class="tok-null">true</span>)) == <span class="tok-builtin">@sizeOf</span>(web3.Block(<span class="tok-null">true</span>)));</span>
+<span class="line" id="L185">    std.debug.assert(<span class="tok-builtin">@typeInfo</span>(JsonBlock(<span class="tok-null">true</span>)).Struct.fields.len == <span class="tok-builtin">@typeInfo</span>(web3.Block(<span class="tok-null">true</span>)).Struct.fields.len);</span>
+<span class="line" id="L186">    std.debug.assert(<span class="tok-builtin">@sizeOf</span>(JsonBlock(<span class="tok-null">false</span>)) == <span class="tok-builtin">@sizeOf</span>(web3.Block(<span class="tok-null">false</span>)));</span>
+<span class="line" id="L187">    std.debug.assert(<span class="tok-builtin">@typeInfo</span>(JsonBlock(<span class="tok-null">false</span>)).Struct.fields.len == <span class="tok-builtin">@typeInfo</span>(web3.Block(<span class="tok-null">false</span>)).Struct.fields.len);</span>
+<span class="line" id="L188">}</span>
+<span class="line" id="L189"></span>
+<span class="line" id="L190"><span class="tok-kw">const</span> json_rpc_header =</span>
+<span class="line" id="L191">    <span class="tok-str">\\{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;</span></span>
+
+<span class="line" id="L192">;</span>
+<span class="line" id="L193"><span class="tok-kw">const</span> params_header =</span>
+<span class="line" id="L194">    <span class="tok-str">\\,&quot;params&quot;:</span></span>
+
+<span class="line" id="L195">;</span>
+<span class="line" id="L196"><span class="tok-kw">const</span> id_header =</span>
+<span class="line" id="L197">    <span class="tok-str">\\&quot;,&quot;id&quot;:</span></span>
+
+<span class="line" id="L198">;</span>
+<span class="line" id="L199"></span>
+<span class="line" id="L200"><span class="tok-comment">/// Handles communication with an Ethereum JSON RPC server. Reference: https://ethereum.org/en/developers/docs/apis/json-rpc/</span></span>
+<span class="line" id="L201"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> JsonRpcProvider = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L202">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L203"></span>
+<span class="line" id="L204">    allocator: std.mem.Allocator,</span>
+<span class="line" id="L205">    endpoint: std.Uri,</span>
+<span class="line" id="L206">    tag_buffer: [<span class="tok-number">21</span>]<span class="tok-type">u8</span>,</span>
+<span class="line" id="L207">    last_error_code: <span class="tok-type">isize</span> = <span class="tok-number">0</span>,</span>
+<span class="line" id="L208">    last_error_message: ?[]<span class="tok-kw">const</span> <span class="tok-type">u8</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L209">    request_buffer: std.ArrayList(<span class="tok-type">u8</span>),</span>
+<span class="line" id="L210">    response_buffer: std.ArrayList(<span class="tok-type">u8</span>),</span>
+<span class="line" id="L211">    id: <span class="tok-type">usize</span> = <span class="tok-number">1</span>,</span>
+<span class="line" id="L212"></span>
+<span class="line" id="L213">    <span class="tok-comment">/// Initializes memory</span></span>
+<span class="line" id="L214">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">init</span>(allocator: std.mem.Allocator, endpoint: std.Uri) !Self {</span>
+<span class="line" id="L215">        <span class="tok-kw">return</span> Self{</span>
+<span class="line" id="L216">            .allocator = allocator,</span>
+<span class="line" id="L217">            .tag_buffer = <span class="tok-null">undefined</span>,</span>
+<span class="line" id="L218">            .request_buffer = <span class="tok-kw">try</span> std.ArrayList(<span class="tok-type">u8</span>).initCapacity(allocator, <span class="tok-number">1024</span>),</span>
+<span class="line" id="L219">            .response_buffer = <span class="tok-kw">try</span> std.ArrayList(<span class="tok-type">u8</span>).initCapacity(allocator, INITIAL_RESPONSE_BUFFER_SIZE),</span>
+<span class="line" id="L220">            .endpoint = endpoint,</span>
+<span class="line" id="L221">        };</span>
+<span class="line" id="L222">    }</span>
+<span class="line" id="L223"></span>
+<span class="line" id="L224">    <span class="tok-comment">/// Frees owned memory</span></span>
+<span class="line" id="L225">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">deinit</span>(self: *Self) <span class="tok-type">void</span> {</span>
+<span class="line" id="L226">        self.request_buffer.clearAndFree();</span>
+<span class="line" id="L227">        self.response_buffer.clearAndFree();</span>
+<span class="line" id="L228">        <span class="tok-kw">if</span> (self.last_error_message) |msg| {</span>
+<span class="line" id="L229">            self.allocator.free(msg);</span>
+<span class="line" id="L230">        }</span>
+<span class="line" id="L231">    }</span>
+<span class="line" id="L232"></span>
+<span class="line" id="L233">    <span class="tok-comment">/// Constructs a web3.Provider for use with the contract abstraction layer</span></span>
+<span class="line" id="L234">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">provider</span>(self: *Self) web3.Provider {</span>
+<span class="line" id="L235">        <span class="tok-kw">return</span> .{</span>
+<span class="line" id="L236">            .ptr = self,</span>
+<span class="line" id="L237">            .vtable = &amp;.{</span>
+<span class="line" id="L238">                .call = providerCall,</span>
+<span class="line" id="L239">            },</span>
+<span class="line" id="L240">        };</span>
+<span class="line" id="L241">    }</span>
+<span class="line" id="L242"></span>
+<span class="line" id="L243">    <span class="tok-comment">/// If a previous error exists, prints it to stderr</span></span>
+<span class="line" id="L244">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">printLastError</span>(self: *Self) <span class="tok-type">void</span> {</span>
+<span class="line" id="L245">        <span class="tok-kw">if</span> (self.last_error_code == <span class="tok-number">0</span>) {</span>
+<span class="line" id="L246">            <span class="tok-kw">return</span>;</span>
+<span class="line" id="L247">        }</span>
+<span class="line" id="L248">        <span class="tok-kw">const</span> error_code = self.last_error_code;</span>
+<span class="line" id="L249">        <span class="tok-kw">const</span> error_msg = self.last_error_message.?;</span>
+<span class="line" id="L250">        std.debug.print(<span class="tok-str">&quot;RPC error ({}): {s}\n&quot;</span>, .{ error_code, error_msg });</span>
+<span class="line" id="L251">    }</span>
+<span class="line" id="L252"></span>
+<span class="line" id="L253">    <span class="tok-comment">/// Implementation of `web3.Provider.call`</span></span>
+<span class="line" id="L254">    <span class="tok-kw">fn</span> <span class="tok-fn">providerCall</span>(ctx: *<span class="tok-type">anyopaque</span>, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
+<span class="line" id="L255">        <span class="tok-kw">var</span> self: *Self = <span class="tok-builtin">@ptrCast</span>(<span class="tok-builtin">@alignCast</span>(ctx));</span>
+<span class="line" id="L256">        <span class="tok-kw">return</span> <span class="tok-builtin">@call</span>(.always_inline, call, .{ self, tx, block_tag });</span>
+<span class="line" id="L257">    }</span>
+<span class="line" id="L258"></span>
+<span class="line" id="L259">    <span class="tok-comment">/// web3_clientVersion</span></span>
+<span class="line" id="L260">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getClientVersion</span>(self: *Self) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
+<span class="line" id="L261">        <span class="tok-kw">var</span> params = web3.EmptyArray{};</span>
+<span class="line" id="L262">        <span class="tok-kw">return</span> self.send(<span class="tok-str">&quot;web3_clientVersion&quot;</span>, params, []<span class="tok-kw">const</span> <span class="tok-type">u8</span>);</span>
+<span class="line" id="L263">    }</span>
+<span class="line" id="L264"></span>
+<span class="line" id="L265">    <span class="tok-comment">/// web3_sha3</span></span>
+<span class="line" id="L266">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">sha3</span>(self: *Self, data: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
+<span class="line" id="L267">        <span class="tok-kw">const</span> hex_data = web3.DataHexString{</span>
+<span class="line" id="L268">            .raw = data,</span>
+<span class="line" id="L269">        };</span>
+<span class="line" id="L270">        <span class="tok-kw">const</span> params = .{hex_data};</span>
+<span class="line" id="L271">        <span class="tok-kw">const</span> result_hex_data = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;web3_sha3&quot;</span>, params, web3.DataHexString);</span>
+<span class="line" id="L272">        <span class="tok-kw">return</span> result_hex_data.raw;</span>
+<span class="line" id="L273">    }</span>
+<span class="line" id="L274"></span>
+<span class="line" id="L275">    <span class="tok-comment">/// net_version</span></span>
+<span class="line" id="L276">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getNetworkId</span>(self: *Self) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
+<span class="line" id="L277">        <span class="tok-kw">var</span> params = web3.EmptyArray{};</span>
+<span class="line" id="L278">        <span class="tok-kw">return</span> self.send(<span class="tok-str">&quot;net_version&quot;</span>, params, []<span class="tok-kw">const</span> <span class="tok-type">u8</span>);</span>
+<span class="line" id="L279">    }</span>
+<span class="line" id="L280"></span>
+<span class="line" id="L281">    <span class="tok-comment">/// net_listening</span></span>
+<span class="line" id="L282">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getNetworkListening</span>(self: *Self) !<span class="tok-type">bool</span> {</span>
+<span class="line" id="L283">        <span class="tok-kw">var</span> params = web3.EmptyArray{};</span>
+<span class="line" id="L284">        <span class="tok-kw">return</span> self.send(<span class="tok-str">&quot;net_listening&quot;</span>, params, <span class="tok-type">bool</span>);</span>
+<span class="line" id="L285">    }</span>
+<span class="line" id="L286"></span>
+<span class="line" id="L287">    <span class="tok-comment">/// net_peerCount</span></span>
+<span class="line" id="L288">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getNetworkPeerCount</span>(self: *Self) !<span class="tok-type">u32</span> {</span>
+<span class="line" id="L289">        <span class="tok-kw">var</span> params = web3.EmptyArray{};</span>
+<span class="line" id="L290">        <span class="tok-kw">return</span> self.send(<span class="tok-str">&quot;net_peerCount&quot;</span>, params, <span class="tok-type">u32</span>);</span>
+<span class="line" id="L291">    }</span>
+<span class="line" id="L292"></span>
+<span class="line" id="L293">    <span class="tok-comment">/// eth_protocolVersion</span></span>
+<span class="line" id="L294">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getProtocolVersion</span>(self: *Self) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
+<span class="line" id="L295">        <span class="tok-kw">var</span> params = web3.EmptyArray{};</span>
+<span class="line" id="L296">        <span class="tok-kw">return</span> self.send(<span class="tok-str">&quot;eth_protocolVersion&quot;</span>, params, []<span class="tok-kw">const</span> <span class="tok-type">u8</span>);</span>
+<span class="line" id="L297">    }</span>
+<span class="line" id="L298"></span>
+<span class="line" id="L299">    <span class="tok-comment">/// eth_syncing</span></span>
+<span class="line" id="L300">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getSyncing</span>(self: *Self) !web3.SyncStatus {</span>
+<span class="line" id="L301">        <span class="tok-kw">var</span> params = web3.EmptyArray{};</span>
+<span class="line" id="L302">        <span class="tok-kw">const</span> result = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_syncing&quot;</span>, params, JsonSyncStatus);</span>
+<span class="line" id="L303">        <span class="tok-kw">return</span> <span class="tok-builtin">@as</span>(*<span class="tok-kw">const</span> web3.SyncStatus, <span class="tok-builtin">@ptrCast</span>(&amp;result)).*;</span>
+<span class="line" id="L304">    }</span>
+<span class="line" id="L305"></span>
+<span class="line" id="L306">    <span class="tok-comment">/// eth_coinbase</span></span>
+<span class="line" id="L307">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getCoinbase</span>(self: *Self) !web3.Address {</span>
+<span class="line" id="L308">        <span class="tok-kw">var</span> params = web3.EmptyArray{};</span>
+<span class="line" id="L309">        <span class="tok-kw">return</span> self.send(<span class="tok-str">&quot;eth_coinbase&quot;</span>, params, web3.Address);</span>
+<span class="line" id="L310">    }</span>
+<span class="line" id="L311"></span>
+<span class="line" id="L312">    <span class="tok-comment">/// eth_chainId</span></span>
+<span class="line" id="L313">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getChainId</span>(self: *Self) !<span class="tok-type">u32</span> {</span>
+<span class="line" id="L314">        <span class="tok-kw">var</span> params = web3.EmptyArray{};</span>
+<span class="line" id="L315">        <span class="tok-kw">const</span> hex_data = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_chainId&quot;</span>, params, web3.IntHexString(<span class="tok-type">u32</span>));</span>
+<span class="line" id="L316">        <span class="tok-kw">return</span> hex_data.raw;</span>
+<span class="line" id="L317">    }</span>
+<span class="line" id="L318"></span>
+<span class="line" id="L319">    <span class="tok-comment">/// eth_mining</span></span>
+<span class="line" id="L320">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getMining</span>(self: *Self) !<span class="tok-type">bool</span> {</span>
+<span class="line" id="L321">        <span class="tok-kw">var</span> params = web3.EmptyArray{};</span>
+<span class="line" id="L322">        <span class="tok-kw">return</span> self.send(<span class="tok-str">&quot;eth_mining&quot;</span>, params, <span class="tok-type">bool</span>);</span>
+<span class="line" id="L323">    }</span>
+<span class="line" id="L324"></span>
+<span class="line" id="L325">    <span class="tok-comment">/// eth_hashrate</span></span>
+<span class="line" id="L326">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getHashrate</span>(self: *Self) !<span class="tok-type">u32</span> {</span>
+<span class="line" id="L327">        <span class="tok-kw">var</span> params = web3.EmptyArray{};</span>
+<span class="line" id="L328">        <span class="tok-kw">const</span> hex_data = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_hashrate&quot;</span>, params, web3.IntHexString(<span class="tok-type">u32</span>));</span>
+<span class="line" id="L329">        <span class="tok-kw">return</span> hex_data.raw;</span>
+<span class="line" id="L330">    }</span>
+<span class="line" id="L331"></span>
+<span class="line" id="L332">    <span class="tok-comment">/// eth_gasPrice</span></span>
+<span class="line" id="L333">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getGasPrice</span>(self: *Self) !<span class="tok-type">u256</span> {</span>
+<span class="line" id="L334">        <span class="tok-kw">var</span> params = web3.EmptyArray{};</span>
+<span class="line" id="L335">        <span class="tok-kw">const</span> hex_data = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_gasPrice&quot;</span>, params, web3.IntHexString(<span class="tok-type">u256</span>));</span>
+<span class="line" id="L336">        <span class="tok-kw">return</span> hex_data.raw;</span>
+<span class="line" id="L337">    }</span>
+<span class="line" id="L338"></span>
+<span class="line" id="L339">    <span class="tok-comment">/// eth_accounts</span></span>
+<span class="line" id="L340">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getAccounts</span>(self: *Self) ![]web3.Address {</span>
+<span class="line" id="L341">        <span class="tok-kw">var</span> params = web3.EmptyArray{};</span>
+<span class="line" id="L342">        <span class="tok-kw">return</span> self.send(<span class="tok-str">&quot;eth_accounts&quot;</span>, params, []web3.Address);</span>
+<span class="line" id="L343">    }</span>
+<span class="line" id="L344"></span>
+<span class="line" id="L345">    <span class="tok-comment">/// eth_blockNumber</span></span>
+<span class="line" id="L346">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getBlockNumber</span>(self: *Self) !<span class="tok-type">u64</span> {</span>
+<span class="line" id="L347">        <span class="tok-kw">var</span> params = web3.EmptyArray{};</span>
+<span class="line" id="L348">        <span class="tok-kw">return</span> self.send(<span class="tok-str">&quot;eth_blockNumber&quot;</span>, params, <span class="tok-type">u64</span>);</span>
+<span class="line" id="L349">    }</span>
+<span class="line" id="L350"></span>
+<span class="line" id="L351">    <span class="tok-comment">/// eth_getBalance</span></span>
+<span class="line" id="L352">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getBalance</span>(self: *Self, addr: web3.Address, block_tag: ?web3.BlockTag) !<span class="tok-type">u256</span> {</span>
+<span class="line" id="L353">        <span class="tok-kw">var</span> params = .{ addr, self.blockTagToString(block_tag) };</span>
+<span class="line" id="L354">        <span class="tok-kw">return</span> self.send(<span class="tok-str">&quot;eth_getBalance&quot;</span>, params, <span class="tok-type">u256</span>);</span>
+<span class="line" id="L355">    }</span>
+<span class="line" id="L356"></span>
+<span class="line" id="L357">    <span class="tok-comment">/// eth_getStorageAt</span></span>
+<span class="line" id="L358">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getStorageAt</span>(self: *Self, addr: web3.Address, slot: <span class="tok-type">u256</span>, block_tag: ?web3.BlockTag) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
+<span class="line" id="L359">        <span class="tok-kw">const</span> hex_slot = web3.IntHexString(<span class="tok-type">u256</span>){</span>
+<span class="line" id="L360">            .raw = slot,</span>
+<span class="line" id="L361">        };</span>
+<span class="line" id="L362">        <span class="tok-kw">var</span> params = .{ addr, hex_slot, self.blockTagToString(block_tag) };</span>
+<span class="line" id="L363">        <span class="tok-kw">const</span> hex_data = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_getStorageAt&quot;</span>, params, web3.DataHexString);</span>
+<span class="line" id="L364">        <span class="tok-kw">return</span> hex_data.raw;</span>
+<span class="line" id="L365">    }</span>
+<span class="line" id="L366"></span>
+<span class="line" id="L367">    <span class="tok-comment">/// eth_getTransactionCount</span></span>
+<span class="line" id="L368">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getTransactionCount</span>(self: *Self, addr: web3.Address, block_tag: ?web3.BlockTag) !<span class="tok-type">u256</span> {</span>
+<span class="line" id="L369">        <span class="tok-kw">var</span> params = .{ addr, self.blockTagToString(block_tag) };</span>
+<span class="line" id="L370">        <span class="tok-kw">return</span> self.send(<span class="tok-str">&quot;eth_getTransactionCount&quot;</span>, params, <span class="tok-type">u256</span>);</span>
+<span class="line" id="L371">    }</span>
+<span class="line" id="L372"></span>
+<span class="line" id="L373">    <span class="tok-comment">/// eth_getBlockTransactionCountByHash</span></span>
+<span class="line" id="L374">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getBlockTransactionCountByHash</span>(self: *Self, block_hash: web3.Hash) !<span class="tok-type">u32</span> {</span>
+<span class="line" id="L375">        <span class="tok-kw">var</span> params = .{block_hash};</span>
+<span class="line" id="L376">        <span class="tok-kw">const</span> hex_data = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_getBlockTransactionCountByHash&quot;</span>, params, web3.IntHexString(<span class="tok-type">u32</span>));</span>
+<span class="line" id="L377">        <span class="tok-kw">return</span> hex_data.raw;</span>
+<span class="line" id="L378">    }</span>
+<span class="line" id="L379"></span>
+<span class="line" id="L380">    <span class="tok-comment">/// eth_getBlockTransactionCountByNumber</span></span>
+<span class="line" id="L381">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getBlockTransactionCountByNumber</span>(self: *Self, block_tag: ?web3.BlockTag) !<span class="tok-type">u32</span> {</span>
+<span class="line" id="L382">        <span class="tok-kw">var</span> params = .{self.blockTagToString(block_tag)};</span>
+<span class="line" id="L383">        <span class="tok-kw">const</span> hex_data = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_getBlockTransactionCountByNumber&quot;</span>, params, web3.IntHexString(<span class="tok-type">u32</span>));</span>
+<span class="line" id="L384">        <span class="tok-kw">return</span> hex_data.raw;</span>
+<span class="line" id="L385">    }</span>
+<span class="line" id="L386"></span>
+<span class="line" id="L387">    <span class="tok-comment">/// eth_getUncleCountByBlockHash</span></span>
+<span class="line" id="L388">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getUncleCountByBlockHash</span>(self: *Self, block_hash: web3.Hash) !<span class="tok-type">u32</span> {</span>
+<span class="line" id="L389">        <span class="tok-kw">var</span> params = .{block_hash};</span>
+<span class="line" id="L390">        <span class="tok-kw">const</span> hex_data = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_getUncleCountByBlockHash&quot;</span>, params, web3.IntHexString(<span class="tok-type">u32</span>));</span>
+<span class="line" id="L391">        <span class="tok-kw">return</span> hex_data.raw;</span>
+<span class="line" id="L392">    }</span>
+<span class="line" id="L393"></span>
+<span class="line" id="L394">    <span class="tok-comment">/// eth_getUncleCountByBlockNumber</span></span>
+<span class="line" id="L395">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getUncleCountByBlockNumber</span>(self: *Self, block_tag: ?web3.BlockTag) !<span class="tok-type">u32</span> {</span>
+<span class="line" id="L396">        <span class="tok-kw">var</span> params = .{self.blockTagToString(block_tag)};</span>
+<span class="line" id="L397">        <span class="tok-kw">const</span> hex_data = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_getUncleCountByBlockNumber&quot;</span>, params, web3.IntHexString(<span class="tok-type">u32</span>));</span>
+<span class="line" id="L398">        <span class="tok-kw">return</span> hex_data.raw;</span>
+<span class="line" id="L399">    }</span>
+<span class="line" id="L400"></span>
+<span class="line" id="L401">    <span class="tok-comment">/// eth_getCode</span></span>
+<span class="line" id="L402">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getCode</span>(self: *Self, addr: web3.Address, block_tag: ?web3.BlockTag) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
+<span class="line" id="L403">        <span class="tok-kw">var</span> params = .{ addr, self.blockTagToString(block_tag) };</span>
+<span class="line" id="L404">        <span class="tok-kw">const</span> hex_data = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_getCode&quot;</span>, params, web3.DataHexString);</span>
+<span class="line" id="L405">        <span class="tok-kw">return</span> hex_data.raw;</span>
+<span class="line" id="L406">    }</span>
+<span class="line" id="L407"></span>
+<span class="line" id="L408">    <span class="tok-comment">/// eth_sign</span></span>
+<span class="line" id="L409">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">sign</span>(self: *Self, addr: web3.Address, data: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
+<span class="line" id="L410">        <span class="tok-kw">const</span> hex_data = web3.DataHexString{</span>
+<span class="line" id="L411">            .raw = data,</span>
+<span class="line" id="L412">        };</span>
+<span class="line" id="L413">        <span class="tok-kw">const</span> params = .{ addr, hex_data };</span>
+<span class="line" id="L414">        <span class="tok-kw">const</span> result_hex_data = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_sign&quot;</span>, params, web3.DataHexString);</span>
+<span class="line" id="L415">        <span class="tok-kw">return</span> result_hex_data.raw;</span>
+<span class="line" id="L416">    }</span>
+<span class="line" id="L417"></span>
+<span class="line" id="L418">    <span class="tok-comment">/// eth_signTransaction</span></span>
+<span class="line" id="L419">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">signTransaction</span>(self: *Self, tx: web3.TransactionRequest) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
+<span class="line" id="L420">        <span class="tok-kw">var</span> json_tx: *<span class="tok-kw">const</span> JsonTransactionRequest = <span class="tok-builtin">@ptrCast</span>(&amp;tx);</span>
+<span class="line" id="L421">        <span class="tok-kw">var</span> params = .{json_tx};</span>
+<span class="line" id="L422">        <span class="tok-kw">var</span> data: web3.DataHexString = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_signTransaction&quot;</span>, params, web3.DataHexString);</span>
+<span class="line" id="L423">        <span class="tok-kw">return</span> data.raw;</span>
+<span class="line" id="L424">    }</span>
+<span class="line" id="L425"></span>
+<span class="line" id="L426">    <span class="tok-comment">/// eth_sendTransaction</span></span>
+<span class="line" id="L427">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">sendTransaction</span>(self: *Self, tx: web3.TransactionRequest) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
+<span class="line" id="L428">        <span class="tok-kw">var</span> json_tx: *<span class="tok-kw">const</span> JsonTransactionRequest = <span class="tok-builtin">@ptrCast</span>(&amp;tx);</span>
+<span class="line" id="L429">        <span class="tok-kw">var</span> params = .{json_tx};</span>
+<span class="line" id="L430">        <span class="tok-kw">var</span> data: web3.DataHexString = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_sendTransaction&quot;</span>, params, web3.DataHexString);</span>
+<span class="line" id="L431">        <span class="tok-kw">return</span> data.raw;</span>
+<span class="line" id="L432">    }</span>
+<span class="line" id="L433"></span>
+<span class="line" id="L434">    <span class="tok-comment">/// eth_sendRawTransactkon</span></span>
+<span class="line" id="L435">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">sendRawTransaction</span>(self: *Self, data: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
+<span class="line" id="L436">        <span class="tok-kw">const</span> hex_data = web3.DataHexString{</span>
+<span class="line" id="L437">            .raw = data,</span>
+<span class="line" id="L438">        };</span>
+<span class="line" id="L439">        <span class="tok-kw">const</span> params = .{hex_data};</span>
+<span class="line" id="L440">        <span class="tok-kw">const</span> result_hex_data = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_sendRawTransaction&quot;</span>, params, web3.DataHexString);</span>
+<span class="line" id="L441">        <span class="tok-kw">return</span> result_hex_data.raw;</span>
+<span class="line" id="L442">    }</span>
+<span class="line" id="L443"></span>
+<span class="line" id="L444">    <span class="tok-comment">/// eth_call</span></span>
+<span class="line" id="L445">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">call</span>(self: *Self, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
+<span class="line" id="L446">        <span class="tok-kw">var</span> json_tx: *<span class="tok-kw">const</span> JsonTransactionRequest = <span class="tok-builtin">@ptrCast</span>(&amp;tx);</span>
+<span class="line" id="L447">        <span class="tok-kw">var</span> params = .{ json_tx, self.blockTagToString(block_tag) };</span>
+<span class="line" id="L448">        <span class="tok-kw">var</span> data: web3.DataHexString = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_call&quot;</span>, params, web3.DataHexString);</span>
+<span class="line" id="L449">        <span class="tok-kw">return</span> data.raw;</span>
+<span class="line" id="L450">    }</span>
+<span class="line" id="L451"></span>
+<span class="line" id="L452">    <span class="tok-comment">/// eth_estimateGas</span></span>
+<span class="line" id="L453">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">estimateGas</span>(self: *Self, tx: web3.TransactionRequest) !<span class="tok-type">u256</span> {</span>
+<span class="line" id="L454">        <span class="tok-kw">var</span> json_tx: *<span class="tok-kw">const</span> JsonTransactionRequest = <span class="tok-builtin">@ptrCast</span>(&amp;tx);</span>
+<span class="line" id="L455">        <span class="tok-kw">var</span> params = .{json_tx};</span>
+<span class="line" id="L456">        <span class="tok-kw">const</span> hex_data = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_estimateGas&quot;</span>, params, web3.IntHexString(<span class="tok-type">u256</span>));</span>
+<span class="line" id="L457">        <span class="tok-kw">return</span> hex_data.raw;</span>
+<span class="line" id="L458">    }</span>
+<span class="line" id="L459"></span>
+<span class="line" id="L460">    <span class="tok-comment">/// eth_getBlockByHash</span></span>
+<span class="line" id="L461">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getBlockByHash</span>(self: *Self, block_hash: web3.Hash, <span class="tok-kw">comptime</span> full_transactions: <span class="tok-type">bool</span>) !web3.Block(full_transactions) {</span>
+<span class="line" id="L462">        <span class="tok-kw">var</span> full = full_transactions;</span>
+<span class="line" id="L463">        <span class="tok-kw">var</span> params = .{ block_hash, full };</span>
+<span class="line" id="L464">        <span class="tok-kw">const</span> result = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_getBlockByHash&quot;</span>, params, JsonBlock(full_transactions));</span>
+<span class="line" id="L465">        <span class="tok-kw">return</span> <span class="tok-builtin">@as</span>(*<span class="tok-kw">const</span> web3.Block(full), <span class="tok-builtin">@ptrCast</span>(&amp;result)).*;</span>
+<span class="line" id="L466">    }</span>
+<span class="line" id="L467"></span>
+<span class="line" id="L468">    <span class="tok-comment">/// eth_getBlockByNumber</span></span>
+<span class="line" id="L469">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getBlockByNumber</span>(self: *Self, block_tag: ?web3.BlockTag, <span class="tok-kw">comptime</span> full_transactions: <span class="tok-type">bool</span>) !web3.Block(full_transactions) {</span>
+<span class="line" id="L470">        <span class="tok-kw">var</span> full = full_transactions;</span>
+<span class="line" id="L471">        <span class="tok-kw">var</span> params = .{ self.blockTagToString(block_tag), full };</span>
+<span class="line" id="L472">        <span class="tok-kw">const</span> result = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_getBlockByNumber&quot;</span>, params, JsonBlock(full_transactions));</span>
+<span class="line" id="L473">        <span class="tok-kw">return</span> <span class="tok-builtin">@as</span>(*<span class="tok-kw">const</span> web3.Block(full_transactions), <span class="tok-builtin">@ptrCast</span>(&amp;result)).*;</span>
+<span class="line" id="L474">    }</span>
+<span class="line" id="L475"></span>
+<span class="line" id="L476">    <span class="tok-comment">/// eth_getTransactionByHash</span></span>
+<span class="line" id="L477">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getTransactionByHash</span>(self: *Self, tx_hash: web3.Hash) !web3.Transaction {</span>
+<span class="line" id="L478">        <span class="tok-kw">var</span> params = .{tx_hash};</span>
+<span class="line" id="L479">        <span class="tok-kw">const</span> result = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_getTransactionByHash&quot;</span>, params, JsonTransaction);</span>
+<span class="line" id="L480">        <span class="tok-kw">return</span> <span class="tok-builtin">@as</span>(*<span class="tok-kw">const</span> web3.Transaction, <span class="tok-builtin">@ptrCast</span>(&amp;result)).*;</span>
+<span class="line" id="L481">    }</span>
+<span class="line" id="L482"></span>
+<span class="line" id="L483">    <span class="tok-comment">/// eth_getTransactionByBlockHashAndIndex</span></span>
+<span class="line" id="L484">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getTransactionByBlockHashAndIndex</span>(self: *Self, block_hash: web3.Hash, index: <span class="tok-type">u32</span>) !web3.Transaction {</span>
+<span class="line" id="L485">        <span class="tok-kw">var</span> params = .{ block_hash, web3.IntHexString(<span class="tok-type">u32</span>).wrap(index) };</span>
+<span class="line" id="L486">        <span class="tok-kw">const</span> result = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_getTransactionByBlockHashAndIndex&quot;</span>, params, JsonTransaction);</span>
+<span class="line" id="L487">        <span class="tok-kw">return</span> <span class="tok-builtin">@as</span>(*<span class="tok-kw">const</span> web3.Transaction, <span class="tok-builtin">@ptrCast</span>(&amp;result)).*;</span>
+<span class="line" id="L488">    }</span>
+<span class="line" id="L489"></span>
+<span class="line" id="L490">    <span class="tok-comment">/// eth_getTransactionByBlockNumberAndIndex</span></span>
+<span class="line" id="L491">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getTransactionByBlockNumberAndIndex</span>(self: *Self, block_tag: ?web3.BlockTag, index: <span class="tok-type">u32</span>) !web3.Transaction {</span>
+<span class="line" id="L492">        <span class="tok-kw">var</span> params = .{ self.blockTagToString(block_tag), web3.IntHexString(<span class="tok-type">u32</span>).wrap(index) };</span>
+<span class="line" id="L493">        <span class="tok-kw">const</span> result = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_getTransactionByBlockNumberAndIndex&quot;</span>, params, JsonTransaction);</span>
+<span class="line" id="L494">        <span class="tok-kw">return</span> <span class="tok-builtin">@as</span>(*<span class="tok-kw">const</span> web3.Transaction, <span class="tok-builtin">@ptrCast</span>(&amp;result)).*;</span>
+<span class="line" id="L495">    }</span>
+<span class="line" id="L496"></span>
+<span class="line" id="L497">    <span class="tok-comment">/// eth_getTransactionReceipt</span></span>
+<span class="line" id="L498">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getTransactionReceipt</span>(self: *Self, tx_hash: web3.Hash) !web3.TransactionReceipt {</span>
+<span class="line" id="L499">        <span class="tok-kw">var</span> params = .{tx_hash};</span>
+<span class="line" id="L500">        <span class="tok-kw">const</span> result = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_getTransactionReceipt&quot;</span>, params, JsonTransactionReceipt);</span>
+<span class="line" id="L501">        <span class="tok-kw">return</span> <span class="tok-builtin">@as</span>(*<span class="tok-kw">const</span> web3.TransactionReceipt, <span class="tok-builtin">@ptrCast</span>(&amp;result)).*;</span>
+<span class="line" id="L502">    }</span>
+<span class="line" id="L503"></span>
+<span class="line" id="L504">    <span class="tok-comment">/// eth_getUncleByBlockHashAndIndex</span></span>
+<span class="line" id="L505">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getUngleByBlockHashAndIndex</span>(self: *Self, block_hash: web3.Hash, index: <span class="tok-type">u32</span>) !web3.Block(<span class="tok-null">false</span>) {</span>
+<span class="line" id="L506">        <span class="tok-kw">var</span> params = .{ block_hash, web3.IntHexString(<span class="tok-type">u32</span>).wrap(index) };</span>
+<span class="line" id="L507">        <span class="tok-kw">const</span> result = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_getUncleByBlockHashAndIndex&quot;</span>, params, JsonBlock(<span class="tok-null">false</span>));</span>
+<span class="line" id="L508">        <span class="tok-kw">return</span> <span class="tok-builtin">@as</span>(*<span class="tok-kw">const</span> web3.Block(<span class="tok-null">false</span>), <span class="tok-builtin">@ptrCast</span>(&amp;result)).*;</span>
+<span class="line" id="L509">    }</span>
+<span class="line" id="L510"></span>
+<span class="line" id="L511">    <span class="tok-comment">/// eth_getUncleByBlockNumberAndIndex</span></span>
+<span class="line" id="L512">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getUngleByBlockNumberAndIndex</span>(self: *Self, block_tag: ?web3.BlockTag, index: <span class="tok-type">u32</span>) !web3.Block(<span class="tok-null">false</span>) {</span>
+<span class="line" id="L513">        <span class="tok-kw">var</span> params = .{ self.blockTagToString(block_tag), web3.IntHexString(<span class="tok-type">u32</span>).wrap(index) };</span>
+<span class="line" id="L514">        <span class="tok-kw">const</span> result = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_getUncleByBlockHashAndIndex&quot;</span>, params, JsonBlock(<span class="tok-null">false</span>));</span>
+<span class="line" id="L515">        <span class="tok-kw">return</span> <span class="tok-builtin">@as</span>(*<span class="tok-kw">const</span> web3.Block(<span class="tok-null">false</span>), <span class="tok-builtin">@ptrCast</span>(&amp;result)).*;</span>
+<span class="line" id="L516">    }</span>
+<span class="line" id="L517"></span>
+<span class="line" id="L518">    <span class="tok-comment">/// eth_getLogs</span></span>
+<span class="line" id="L519">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getLogs</span>(self: *Self, from_block_tag: ?web3.BlockTag, to_block_tag: ?web3.BlockTag, address: ?web3.Address, topics: ?[]<span class="tok-kw">const</span> web3.Hash) !web3.Logs {</span>
+<span class="line" id="L520">        <span class="tok-kw">var</span> params = .{.{</span>
+<span class="line" id="L521">            .fromBlock = self.blockTagToString(from_block_tag),</span>
+<span class="line" id="L522">            .toBlock = self.blockTagToString(to_block_tag),</span>
+<span class="line" id="L523">            .address = address,</span>
+<span class="line" id="L524">            .topics = topics,</span>
+<span class="line" id="L525">        }};</span>
+<span class="line" id="L526"></span>
+<span class="line" id="L527">        <span class="tok-kw">const</span> result = <span class="tok-kw">try</span> self.send(<span class="tok-str">&quot;eth_getLogs&quot;</span>, params, JsonLogs);</span>
+<span class="line" id="L528">        <span class="tok-kw">return</span> <span class="tok-builtin">@as</span>(*<span class="tok-kw">const</span> web3.Logs, <span class="tok-builtin">@ptrCast</span>(&amp;result)).*;</span>
+<span class="line" id="L529">    }</span>
+<span class="line" id="L530"></span>
+<span class="line" id="L531">    <span class="tok-comment">/// Makes an RPC call to the server and then attempts to decode the result into the given</span></span>
+<span class="line" id="L532">    <span class="tok-comment">/// type. On failure, attempts to read an error message from the response and puts it in</span></span>
+<span class="line" id="L533">    <span class="tok-comment">/// last_error_code and last_error_message. Memory is correctly cleaned up on error condition.</span></span>
+<span class="line" id="L534">    <span class="tok-comment">/// Caller owns the memory otherwise.</span></span>
+<span class="line" id="L535">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">send</span>(self: *Self, method: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, args: <span class="tok-kw">anytype</span>, <span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>) !T {</span>
+<span class="line" id="L536">        <span class="tok-kw">try</span> self.sendInternal(method, args);</span>
+<span class="line" id="L537"></span>
+<span class="line" id="L538">        <span class="tok-kw">var</span> arena = parser_allocator.ArenaAllocator.init(self.allocator);</span>
+<span class="line" id="L539">        <span class="tok-kw">var</span> parent_allocator = arena.allocator();</span>
+<span class="line" id="L540"></span>
+<span class="line" id="L541">        <span class="tok-kw">var</span> ptr = self.response_buffer.items;</span>
+<span class="line" id="L542"></span>
+<span class="line" id="L543">        <span class="tok-kw">const</span> success_result = web3.json.JsonReader.parse(parent_allocator, &amp;ptr, JsonRpcResponse(T)) <span class="tok-kw">catch</span> {</span>
+<span class="line" id="L544">            arena.deinit();</span>
+<span class="line" id="L545"></span>
+<span class="line" id="L546">            <span class="tok-comment">// Reset pointer and attempt to read an error instead</span>
+</span>
+<span class="line" id="L547">            ptr = self.response_buffer.items;</span>
+<span class="line" id="L548">            <span class="tok-kw">const</span> error_result = web3.json.JsonReader.parse(parent_allocator, &amp;ptr, JsonRpcError) <span class="tok-kw">catch</span> {</span>
+<span class="line" id="L549">                arena.deinit();</span>
+<span class="line" id="L550">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidResponse;</span>
+<span class="line" id="L551">            };</span>
+<span class="line" id="L552"></span>
+<span class="line" id="L553">            <span class="tok-kw">if</span> (self.last_error_message) |msg| {</span>
+<span class="line" id="L554">                self.allocator.free(msg);</span>
+<span class="line" id="L555">            }</span>
+<span class="line" id="L556"></span>
+<span class="line" id="L557">            self.last_error_message = error_result.@&quot;error&quot;.message;</span>
+<span class="line" id="L558">            self.last_error_code = error_result.@&quot;error&quot;.code;</span>
+<span class="line" id="L559"></span>
+<span class="line" id="L560">            arena.freeList();</span>
+<span class="line" id="L561">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.RpcError;</span>
+<span class="line" id="L562">        };</span>
+<span class="line" id="L563"></span>
+<span class="line" id="L564">        arena.freeList();</span>
+<span class="line" id="L565">        <span class="tok-kw">return</span> success_result.result;</span>
+<span class="line" id="L566">    }</span>
+<span class="line" id="L567"></span>
+<span class="line" id="L568">    <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">sendInternal</span>(self: *Self, method: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, args: <span class="tok-kw">anytype</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L569">        <span class="tok-kw">try</span> self.constructRpcCall(self.id, method, args);</span>
+<span class="line" id="L570">        self.id += <span class="tok-number">1</span>;</span>
+<span class="line" id="L571">        <span class="tok-kw">try</span> self.performRequest(self.request_buffer.items);</span>
+<span class="line" id="L572">    }</span>
+<span class="line" id="L573"></span>
+<span class="line" id="L574">    <span class="tok-kw">fn</span> <span class="tok-fn">constructRpcCall</span>(self: *Self, id: <span class="tok-type">usize</span>, method: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, params: <span class="tok-kw">anytype</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L575">        self.request_buffer.items.len = <span class="tok-number">0</span>;</span>
+<span class="line" id="L576">        <span class="tok-kw">var</span> writer = self.request_buffer.writer();</span>
+<span class="line" id="L577"></span>
+<span class="line" id="L578">        _ = <span class="tok-kw">try</span> writer.write(json_rpc_header);</span>
+<span class="line" id="L579">        _ = <span class="tok-kw">try</span> writer.write(method);</span>
+<span class="line" id="L580">        _ = <span class="tok-kw">try</span> writer.write(id_header);</span>
+<span class="line" id="L581">        _ = <span class="tok-kw">try</span> std.fmt.formatInt(id, <span class="tok-number">10</span>, .lower, .{}, writer);</span>
+<span class="line" id="L582">        _ = <span class="tok-kw">try</span> writer.write(params_header);</span>
+<span class="line" id="L583">        _ = <span class="tok-kw">try</span> web3.json.JsonWriter.write(params, writer);</span>
+<span class="line" id="L584">        <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">'}'</span>);</span>
+<span class="line" id="L585">    }</span>
+<span class="line" id="L586"></span>
+<span class="line" id="L587">    <span class="tok-comment">// TODO: Refactor this out to a &quot;transport&quot; interface and support WebSocket and IPC</span>
+</span>
+<span class="line" id="L588">    <span class="tok-kw">fn</span> <span class="tok-fn">performRequest</span>(self: *Self, data: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L589">        <span class="tok-kw">var</span> client = std.http.Client{</span>
+<span class="line" id="L590">            .allocator = self.allocator,</span>
+<span class="line" id="L591">        };</span>
+<span class="line" id="L592">        <span class="tok-kw">defer</span> client.deinit();</span>
+<span class="line" id="L593"></span>
+<span class="line" id="L594">        <span class="tok-kw">var</span> headers = std.http.Headers{ .allocator = self.allocator };</span>
+<span class="line" id="L595">        <span class="tok-kw">defer</span> headers.deinit();</span>
+<span class="line" id="L596"></span>
+<span class="line" id="L597">        <span class="tok-comment">// Add content length header</span>
+</span>
+<span class="line" id="L598">        <span class="tok-kw">var</span> length_str: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L599">        <span class="tok-kw">const</span> length_str_len = std.fmt.formatIntBuf(length_str[<span class="tok-number">0</span>..], data.len, <span class="tok-number">10</span>, .lower, .{});</span>
+<span class="line" id="L600">        <span class="tok-kw">try</span> headers.append(<span class="tok-str">&quot;content-length&quot;</span>, length_str[<span class="tok-number">0</span>..length_str_len]);</span>
+<span class="line" id="L601"></span>
+<span class="line" id="L602">        <span class="tok-kw">try</span> headers.append(<span class="tok-str">&quot;content-type&quot;</span>, <span class="tok-str">&quot;application/json&quot;</span>);</span>
+<span class="line" id="L603"></span>
+<span class="line" id="L604">        <span class="tok-comment">// Perform the request</span>
+</span>
+<span class="line" id="L605">        <span class="tok-kw">var</span> req = <span class="tok-kw">try</span> client.request(.POST, self.endpoint, headers, .{});</span>
+<span class="line" id="L606">        <span class="tok-kw">defer</span> req.deinit();</span>
+<span class="line" id="L607"></span>
+<span class="line" id="L608">        <span class="tok-kw">try</span> req.start();</span>
+<span class="line" id="L609">        _ = <span class="tok-kw">try</span> req.write(data);</span>
+<span class="line" id="L610">        <span class="tok-kw">try</span> req.wait();</span>
+<span class="line" id="L611"></span>
+<span class="line" id="L612">        <span class="tok-comment">// Read entire result into buffer</span>
+</span>
+<span class="line" id="L613">        self.response_buffer.items.len = <span class="tok-number">0</span>;</span>
+<span class="line" id="L614">        <span class="tok-kw">try</span> req.reader().readAllArrayList(&amp;self.response_buffer, MAX_RESPONSE_BUFFER_SIZE);</span>
+<span class="line" id="L615">    }</span>
+<span class="line" id="L616"></span>
+<span class="line" id="L617">    <span class="tok-comment">/// Stringifies given block tag, uses internal buffer</span></span>
+<span class="line" id="L618">    <span class="tok-kw">fn</span> <span class="tok-fn">blockTagToString</span>(self: *Self, block_tag: ?web3.BlockTag) web3.String {</span>
+<span class="line" id="L619">        <span class="tok-kw">if</span> (block_tag == <span class="tok-null">null</span>) {</span>
+<span class="line" id="L620">            <span class="tok-kw">return</span> web3.String.wrap(<span class="tok-str">&quot;latest&quot;</span>);</span>
+<span class="line" id="L621">        }</span>
+<span class="line" id="L622">        <span class="tok-kw">switch</span> (block_tag.?) {</span>
+<span class="line" id="L623">            .tag =&gt; |tag| {</span>
+<span class="line" id="L624">                <span class="tok-kw">switch</span> (tag) {</span>
+<span class="line" id="L625">                    .earliest =&gt; <span class="tok-kw">return</span> web3.String.wrap(<span class="tok-str">&quot;earliest&quot;</span>),</span>
+<span class="line" id="L626">                    .latest =&gt; <span class="tok-kw">return</span> web3.String.wrap(<span class="tok-str">&quot;latest&quot;</span>),</span>
+<span class="line" id="L627">                    .safe =&gt; <span class="tok-kw">return</span> web3.String.wrap(<span class="tok-str">&quot;safe&quot;</span>),</span>
+<span class="line" id="L628">                    .finalized =&gt; <span class="tok-kw">return</span> web3.String.wrap(<span class="tok-str">&quot;finalized&quot;</span>),</span>
+<span class="line" id="L629">                    .pending =&gt; <span class="tok-kw">return</span> web3.String.wrap(<span class="tok-str">&quot;pending&quot;</span>),</span>
+<span class="line" id="L630">                }</span>
+<span class="line" id="L631">            },</span>
+<span class="line" id="L632">            .number =&gt; |number| {</span>
+<span class="line" id="L633">                <span class="tok-kw">const</span> len = std.fmt.formatIntBuf(&amp;self.tag_buffer, number, <span class="tok-number">10</span>, .lower, .{});</span>
+<span class="line" id="L634">                <span class="tok-kw">return</span> web3.String.wrap(self.tag_buffer[<span class="tok-number">0</span>..len]);</span>
+<span class="line" id="L635">            },</span>
+<span class="line" id="L636">        }</span>
+<span class="line" id="L637">    }</span>
+<span class="line" id="L638">};</span>
+<span class="line" id="L639"></span>
+</code></pre></body>
+</html>

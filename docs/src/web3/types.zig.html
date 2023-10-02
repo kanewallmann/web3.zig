@@ -1,0 +1,914 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">    <title>types.zig - source view</title>
+    <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAPNJREFUeNpi/P//PwMlgOXHUjly9E0G4hwgZmQiQZMqEK8H4v9QzUEgQSaoADK+zhH9iAGL+C0gDoAaNg9mGLoLfgA1awK9hS9gzgJxA9RQBmQDrgMxJzRMGKE4HYj/Ial5A8QmQLwCJoBsgBYW2+TR1ChDaWt4LOBxKsi/VUh8XiD+gq4IVyzwQAMJBoKwacZlAB8Qf0bi96IZhtOAe1D6LpqaEiz6rmEzQAeIzwGxCJpieFqApo/vQKyJboAaEBsAsSEupwI1MwKjGBTVHOhegMX5UajYRqiBjMgYmj400cVh0XgTiKdC0zhJgJHS7AwQYABm9EAdCKrEfAAAAABJRU5ErkJggg=="/>
+    <style>
+      body{
+        font-family: system-ui, -apple-system, Roboto, "Segoe UI", sans-serif;
+        margin: 0;
+        line-height: 1.5;
+      }
+
+      pre > code {
+        display: block;
+        overflow: auto;
+        line-height: normal;
+        margin: 0em;
+      }
+      .tok-kw {
+          color: #333;
+          font-weight: bold;
+      }
+      .tok-str {
+          color: #d14;
+      }
+      .tok-builtin {
+          color: #005C7A;
+      }
+      .tok-comment {
+          color: #545454;
+          font-style: italic;
+      }
+      .tok-fn {
+          color: #900;
+          font-weight: bold;
+      }
+      .tok-null {
+          color: #005C5C;
+      }
+      .tok-number {
+          color: #005C5C;
+      }
+      .tok-type {
+          color: #458;
+          font-weight: bold;
+      }
+      pre {
+        counter-reset: line;
+      }
+      pre .line:before {
+        counter-increment: line;
+        content: counter(line);
+        display: inline-block;
+        padding-right: 1em;
+        width: 2em;
+        text-align: right;
+        color: #999;
+      }
+      
+      .line {
+        width: 100%;
+        display: inline-block;
+      }
+      .line:target {
+        border-top: 1px solid #ccc;
+        border-bottom: 1px solid #ccc;
+        background: #fafafa;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body{
+            background:#222;
+            color: #ccc;
+        }
+        pre > code {
+            color: #ccc;
+            background: #222;
+            border: unset;
+        }
+        .line:target {
+            border-top: 1px solid #444;
+            border-bottom: 1px solid #444;
+            background: #333;
+        }
+        .tok-kw {
+            color: #eee;
+        }
+        .tok-str {
+            color: #2e5;
+        }
+        .tok-builtin {
+            color: #ff894c;
+        }
+        .tok-comment {
+            color: #aa7;
+        }
+        .tok-fn {
+            color: #B1A0F8;
+        }
+        .tok-null {
+            color: #ff8080;
+        }
+        .tok-number {
+            color: #ff8080;
+        }
+        .tok-type {
+            color: #68f;
+        }
+      }
+    </style>
+</head>
+<body>
+<pre><code><span class="line" id="L1"><span class="tok-kw">const</span> std = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;std&quot;</span>);</span>
+<span class="line" id="L2"><span class="tok-kw">const</span> json = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;json.zig&quot;</span>);</span>
+<span class="line" id="L3"><span class="tok-kw">const</span> util = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;util.zig&quot;</span>);</span>
+<span class="line" id="L4"></span>
+<span class="line" id="L5"><span class="tok-comment">/// Represents an Ethereum address of 20 bytes</span></span>
+<span class="line" id="L6"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> Address = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L7">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L8"></span>
+<span class="line" id="L9">    raw: [<span class="tok-number">20</span>]<span class="tok-type">u8</span>,</span>
+<span class="line" id="L10"></span>
+<span class="line" id="L11">    <span class="tok-comment">/// Creates an Address from a string</span></span>
+<span class="line" id="L12">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">fromString</span>(str: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !Self {</span>
+<span class="line" id="L13">        std.debug.assert(str.len == <span class="tok-number">40</span> <span class="tok-kw">or</span> str.len == <span class="tok-number">42</span>);</span>
+<span class="line" id="L14"></span>
+<span class="line" id="L15">        <span class="tok-kw">var</span> _str = str;</span>
+<span class="line" id="L16"></span>
+<span class="line" id="L17">        <span class="tok-kw">if</span> (str.len == <span class="tok-number">42</span>) {</span>
+<span class="line" id="L18">            std.debug.assert(std.mem.eql(<span class="tok-type">u8</span>, str[<span class="tok-number">0</span>..<span class="tok-number">2</span>], <span class="tok-str">&quot;0x&quot;</span>));</span>
+<span class="line" id="L19">            _str = _str[<span class="tok-number">2</span>..];</span>
+<span class="line" id="L20">        }</span>
+<span class="line" id="L21"></span>
+<span class="line" id="L22">        <span class="tok-kw">var</span> self: Self = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L23">        _ = std.fmt.hexToBytes(self.raw[<span class="tok-number">0</span>..], _str) <span class="tok-kw">catch</span> <span class="tok-kw">unreachable</span>;</span>
+<span class="line" id="L24">        <span class="tok-kw">return</span> self;</span>
+<span class="line" id="L25">    }</span>
+<span class="line" id="L26"></span>
+<span class="line" id="L27">    <span class="tok-comment">/// Writes the address in JSON</span></span>
+<span class="line" id="L28">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">toJson</span>(self: *<span class="tok-kw">const</span> Self, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">usize</span> {</span>
+<span class="line" id="L29">        <span class="tok-kw">return</span> json.JsonWriter.write(self.raw, writer);</span>
+<span class="line" id="L30">    }</span>
+<span class="line" id="L31"></span>
+<span class="line" id="L32">    <span class="tok-comment">/// Format helper</span></span>
+<span class="line" id="L33">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">format</span>(self: Self, <span class="tok-kw">comptime</span> _: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, _: std.fmt.FormatOptions, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L34">        <span class="tok-kw">return</span> writer.print(<span class="tok-str">&quot;0x{}&quot;</span>, .{std.fmt.fmtSliceHexLower(self.raw[<span class="tok-number">0</span>..])});</span>
+<span class="line" id="L35">    }</span>
+<span class="line" id="L36">};</span>
+<span class="line" id="L37"></span>
+<span class="line" id="L38"><span class="tok-kw">fn</span> <span class="tok-fn">comptimePow</span>(<span class="tok-kw">comptime</span> a: <span class="tok-type">comptime_int</span>, <span class="tok-kw">comptime</span> b: <span class="tok-type">comptime_int</span>) <span class="tok-type">comptime_int</span> {</span>
+<span class="line" id="L39">    <span class="tok-kw">var</span> res = a;</span>
+<span class="line" id="L40">    <span class="tok-kw">for</span> (<span class="tok-number">0</span>..b - <span class="tok-number">1</span>) |_| {</span>
+<span class="line" id="L41">        res *= res;</span>
+<span class="line" id="L42">    }</span>
+<span class="line" id="L43">    <span class="tok-kw">return</span> res;</span>
+<span class="line" id="L44">}</span>
+<span class="line" id="L45"></span>
+<span class="line" id="L46"><span class="tok-comment">/// Provides methods for working with fixed point integers</span></span>
+<span class="line" id="L47"><span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">FixedPoint</span>(<span class="tok-kw">comptime</span> decimals: <span class="tok-type">comptime_int</span>, <span class="tok-kw">comptime</span> T: <span class="tok-kw">anytype</span>) <span class="tok-type">type</span> {</span>
+<span class="line" id="L48">    <span class="tok-kw">return</span> <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L49">        <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L50">        <span class="tok-kw">const</span> one: T = std.math.pow(T, <span class="tok-number">10</span>, decimals);</span>
+<span class="line" id="L51"></span>
+<span class="line" id="L52">        <span class="tok-kw">const</span> Double = <span class="tok-builtin">@Type</span>(std.builtin.Type{</span>
+<span class="line" id="L53">            .Int = .{</span>
+<span class="line" id="L54">                .signedness = <span class="tok-builtin">@typeInfo</span>(T).Int.signedness,</span>
+<span class="line" id="L55">                .bits = <span class="tok-builtin">@typeInfo</span>(T).Int.bits * <span class="tok-number">2</span>,</span>
+<span class="line" id="L56">            },</span>
+<span class="line" id="L57">        });</span>
+<span class="line" id="L58"></span>
+<span class="line" id="L59">        raw: T,</span>
+<span class="line" id="L60"></span>
+<span class="line" id="L61">        <span class="tok-comment">/// Wraps an existing fixed point</span></span>
+<span class="line" id="L62">        <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">wrap</span>(val: <span class="tok-kw">anytype</span>) Self {</span>
+<span class="line" id="L63">            <span class="tok-kw">return</span> Self{</span>
+<span class="line" id="L64">                .raw = <span class="tok-builtin">@intCast</span>(val),</span>
+<span class="line" id="L65">            };</span>
+<span class="line" id="L66">        }</span>
+<span class="line" id="L67"></span>
+<span class="line" id="L68">        <span class="tok-comment">/// Converts a regular into into a fixed point</span></span>
+<span class="line" id="L69">        <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">fromInt</span>(val: <span class="tok-kw">anytype</span>) Self {</span>
+<span class="line" id="L70">            <span class="tok-kw">return</span> Self{</span>
+<span class="line" id="L71">                .raw = <span class="tok-builtin">@intCast</span>(val * one),</span>
+<span class="line" id="L72">            };</span>
+<span class="line" id="L73">        }</span>
+<span class="line" id="L74"></span>
+<span class="line" id="L75">        <span class="tok-comment">/// Returns an approximation of this value as a floating point value</span></span>
+<span class="line" id="L76">        <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">toFloat</span>(self: Self) <span class="tok-type">f64</span> {</span>
+<span class="line" id="L77">            <span class="tok-kw">return</span> <span class="tok-builtin">@as</span>(<span class="tok-type">f64</span>, <span class="tok-builtin">@floatFromInt</span>(self.raw)) / <span class="tok-builtin">@as</span>(<span class="tok-type">f64</span>, <span class="tok-builtin">@floatFromInt</span>(comptimePow(<span class="tok-number">10</span>, decimals)));</span>
+<span class="line" id="L78">        }</span>
+<span class="line" id="L79"></span>
+<span class="line" id="L80">        <span class="tok-comment">// Arithmetic</span>
+</span>
+<span class="line" id="L81"></span>
+<span class="line" id="L82">        <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">add</span>(self: Self, other: <span class="tok-kw">anytype</span>) Self {</span>
+<span class="line" id="L83">            <span class="tok-kw">if</span> (<span class="tok-builtin">@TypeOf</span>(other) == Self) {</span>
+<span class="line" id="L84">                <span class="tok-kw">return</span> wrap(self.raw + other.raw);</span>
+<span class="line" id="L85">            } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L86">                <span class="tok-kw">return</span> wrap(self.raw + fromInt(other));</span>
+<span class="line" id="L87">            }</span>
+<span class="line" id="L88">        }</span>
+<span class="line" id="L89"></span>
+<span class="line" id="L90">        <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">sub</span>(self: Self, other: <span class="tok-kw">anytype</span>) Self {</span>
+<span class="line" id="L91">            <span class="tok-kw">if</span> (<span class="tok-builtin">@TypeOf</span>(other) == Self) {</span>
+<span class="line" id="L92">                <span class="tok-kw">return</span> wrap(self.raw - other.raw);</span>
+<span class="line" id="L93">            } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L94">                <span class="tok-kw">return</span> wrap(self.raw - fromInt(other));</span>
+<span class="line" id="L95">            }</span>
+<span class="line" id="L96">        }</span>
+<span class="line" id="L97"></span>
+<span class="line" id="L98">        <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">mul</span>(self: Self, other: <span class="tok-kw">anytype</span>) Self {</span>
+<span class="line" id="L99">            <span class="tok-kw">if</span> (<span class="tok-builtin">@TypeOf</span>(other) == Self) {</span>
+<span class="line" id="L100">                <span class="tok-kw">const</span> a: Double = <span class="tok-builtin">@intCast</span>(self.raw);</span>
+<span class="line" id="L101">                <span class="tok-kw">const</span> b: Double = <span class="tok-builtin">@intCast</span>(other.raw);</span>
+<span class="line" id="L102">                <span class="tok-kw">return</span> wrap(<span class="tok-builtin">@divTrunc</span>(a * b, one));</span>
+<span class="line" id="L103">            } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L104">                <span class="tok-kw">return</span> wrap(self.raw * <span class="tok-builtin">@as</span>(T, <span class="tok-builtin">@intCast</span>(other)));</span>
+<span class="line" id="L105">            }</span>
+<span class="line" id="L106">        }</span>
+<span class="line" id="L107"></span>
+<span class="line" id="L108">        <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">div</span>(self: Self, other: <span class="tok-kw">anytype</span>) Self {</span>
+<span class="line" id="L109">            <span class="tok-kw">if</span> (<span class="tok-builtin">@TypeOf</span>(other) == Self) {</span>
+<span class="line" id="L110">                <span class="tok-kw">return</span> wrap(<span class="tok-builtin">@divTrunc</span>(self.raw * one, other.raw));</span>
+<span class="line" id="L111">            } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L112">                <span class="tok-kw">return</span> wrap(self.raw / <span class="tok-builtin">@as</span>(T, <span class="tok-builtin">@intCast</span>(other)));</span>
+<span class="line" id="L113">            }</span>
+<span class="line" id="L114">        }</span>
+<span class="line" id="L115"></span>
+<span class="line" id="L116">        <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">mod</span>(self: Self, other: <span class="tok-kw">anytype</span>) Self {</span>
+<span class="line" id="L117">            <span class="tok-kw">if</span> (<span class="tok-builtin">@TypeOf</span>(other) == Self) {</span>
+<span class="line" id="L118">                <span class="tok-kw">return</span> wrap(<span class="tok-builtin">@mod</span>(self.raw, other.raw));</span>
+<span class="line" id="L119">            } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L120">                <span class="tok-kw">return</span> wrap(<span class="tok-builtin">@mod</span>(self.raw, fromInt(other)));</span>
+<span class="line" id="L121">            }</span>
+<span class="line" id="L122">        }</span>
+<span class="line" id="L123"></span>
+<span class="line" id="L124">        <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">neg</span>(self: Self) Self {</span>
+<span class="line" id="L125">            <span class="tok-kw">return</span> wrap(-self.raw);</span>
+<span class="line" id="L126">        }</span>
+<span class="line" id="L127"></span>
+<span class="line" id="L128">        <span class="tok-comment">// Comparison operators</span>
+</span>
+<span class="line" id="L129"></span>
+<span class="line" id="L130">        <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">eql</span>(self: Self, other: <span class="tok-kw">anytype</span>) <span class="tok-type">bool</span> {</span>
+<span class="line" id="L131">            <span class="tok-kw">if</span> (<span class="tok-builtin">@TypeOf</span>(other) == Self) {</span>
+<span class="line" id="L132">                <span class="tok-kw">return</span> self.raw == other.raw;</span>
+<span class="line" id="L133">            } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L134">                <span class="tok-kw">return</span> self.raw == fromInt(other);</span>
+<span class="line" id="L135">            }</span>
+<span class="line" id="L136">        }</span>
+<span class="line" id="L137"></span>
+<span class="line" id="L138">        <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">lt</span>(self: Self, other: <span class="tok-kw">anytype</span>) <span class="tok-type">bool</span> {</span>
+<span class="line" id="L139">            <span class="tok-kw">if</span> (<span class="tok-builtin">@TypeOf</span>(other) == Self) {</span>
+<span class="line" id="L140">                <span class="tok-kw">return</span> self.raw &lt; other.raw;</span>
+<span class="line" id="L141">            } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L142">                <span class="tok-kw">return</span> self.raw &lt; fromInt(other);</span>
+<span class="line" id="L143">            }</span>
+<span class="line" id="L144">        }</span>
+<span class="line" id="L145"></span>
+<span class="line" id="L146">        <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">lte</span>(self: Self, other: <span class="tok-kw">anytype</span>) <span class="tok-type">bool</span> {</span>
+<span class="line" id="L147">            <span class="tok-kw">if</span> (<span class="tok-builtin">@TypeOf</span>(other) == Self) {</span>
+<span class="line" id="L148">                <span class="tok-kw">return</span> self.raw &lt;= other.raw;</span>
+<span class="line" id="L149">            } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L150">                <span class="tok-kw">return</span> self.raw &lt;= fromInt(other);</span>
+<span class="line" id="L151">            }</span>
+<span class="line" id="L152">        }</span>
+<span class="line" id="L153"></span>
+<span class="line" id="L154">        <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">gte</span>(self: Self, other: <span class="tok-kw">anytype</span>) <span class="tok-type">bool</span> {</span>
+<span class="line" id="L155">            <span class="tok-kw">if</span> (<span class="tok-builtin">@TypeOf</span>(other) == Self) {</span>
+<span class="line" id="L156">                <span class="tok-kw">return</span> self.raw &gt;= other.raw;</span>
+<span class="line" id="L157">            } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L158">                <span class="tok-kw">return</span> self.raw &gt;= fromInt(other);</span>
+<span class="line" id="L159">            }</span>
+<span class="line" id="L160">        }</span>
+<span class="line" id="L161"></span>
+<span class="line" id="L162">        <span class="tok-comment">/// Format helper</span></span>
+<span class="line" id="L163">        <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">format</span>(self: Self, <span class="tok-kw">comptime</span> _: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, opts: std.fmt.FormatOptions, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L164">            <span class="tok-kw">if</span> (opts.precision) |precision| {</span>
+<span class="line" id="L165">                <span class="tok-kw">return</span> self.toStringTrunc(precision, writer);</span>
+<span class="line" id="L166">            } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L167">                <span class="tok-kw">return</span> self.toString(writer);</span>
+<span class="line" id="L168">            }</span>
+<span class="line" id="L169">        }</span>
+<span class="line" id="L170"></span>
+<span class="line" id="L171">        <span class="tok-comment">/// Writes this value to the given writer as a string</span></span>
+<span class="line" id="L172">        <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">toString</span>(self: Self, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L173">            <span class="tok-kw">const</span> integer = <span class="tok-builtin">@divFloor</span>(self.raw, one);</span>
+<span class="line" id="L174">            <span class="tok-kw">const</span> frac = <span class="tok-builtin">@rem</span>(self.raw, one);</span>
+<span class="line" id="L175">            <span class="tok-kw">return</span> writer.print(<span class="tok-str">&quot;{d}.{d}&quot;</span>, .{ integer, frac });</span>
+<span class="line" id="L176">        }</span>
+<span class="line" id="L177"></span>
+<span class="line" id="L178">        <span class="tok-comment">/// Writes this value to the given writer as a string truncted to the requested decimal points</span></span>
+<span class="line" id="L179">        <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">toStringTrunc</span>(self: Self, precision: <span class="tok-type">usize</span>, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L180">            <span class="tok-kw">const</span> integer = <span class="tok-builtin">@divFloor</span>(self.raw, one);</span>
+<span class="line" id="L181">            <span class="tok-kw">const</span> frac = <span class="tok-builtin">@rem</span>(self.raw, one);</span>
+<span class="line" id="L182">            <span class="tok-kw">var</span> frac_str: [decimals]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L183">            _ = std.fmt.formatIntBuf(&amp;frac_str, frac, <span class="tok-number">10</span>, .lower, .{});</span>
+<span class="line" id="L184">            <span class="tok-kw">try</span> writer.print(<span class="tok-str">&quot;{d}.&quot;</span>, .{integer});</span>
+<span class="line" id="L185">            _ = <span class="tok-kw">try</span> writer.write(frac_str[<span class="tok-number">0</span>..precision]);</span>
+<span class="line" id="L186">        }</span>
+<span class="line" id="L187">    };</span>
+<span class="line" id="L188">}</span>
+<span class="line" id="L189"></span>
+<span class="line" id="L190"><span class="tok-comment">/// Type def of a FixedPoint(18, u256)</span></span>
+<span class="line" id="L191"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> Ether = FixedPoint(<span class="tok-number">18</span>, <span class="tok-type">u256</span>);</span>
+<span class="line" id="L192"></span>
+<span class="line" id="L193"><span class="tok-comment">/// Wrapper type around a byte array which informs the JSON parser to treat it</span></span>
+<span class="line" id="L194"><span class="tok-comment">/// as a string instead of encoding the bytes in hex</span></span>
+<span class="line" id="L195"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> String = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L196">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L197"></span>
+<span class="line" id="L198">    raw: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
+<span class="line" id="L199"></span>
+<span class="line" id="L200">    <span class="tok-comment">/// Wraps existing memory</span></span>
+<span class="line" id="L201">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">wrap</span>(raw: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) Self {</span>
+<span class="line" id="L202">        <span class="tok-kw">return</span> Self{</span>
+<span class="line" id="L203">            .raw = raw,</span>
+<span class="line" id="L204">        };</span>
+<span class="line" id="L205">    }</span>
+<span class="line" id="L206"></span>
+<span class="line" id="L207">    <span class="tok-comment">/// Allocates memory and copies string from supplied buffer</span></span>
+<span class="line" id="L208">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">fromStringAlloc</span>(allocator: std.mem.Allocator, buffer: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !Self {</span>
+<span class="line" id="L209">        <span class="tok-kw">var</span> self = Self{</span>
+<span class="line" id="L210">            .raw = <span class="tok-kw">try</span> allocator.alloc(<span class="tok-type">u8</span>, buffer.len),</span>
+<span class="line" id="L211">        };</span>
+<span class="line" id="L212"></span>
+<span class="line" id="L213">        <span class="tok-kw">if</span> (buffer.len &gt; <span class="tok-number">0</span>) {</span>
+<span class="line" id="L214">            <span class="tok-builtin">@memcpy</span>(<span class="tok-builtin">@constCast</span>(self.raw), buffer);</span>
+<span class="line" id="L215">        }</span>
+<span class="line" id="L216"></span>
+<span class="line" id="L217">        <span class="tok-kw">return</span> self;</span>
+<span class="line" id="L218">    }</span>
+<span class="line" id="L219"></span>
+<span class="line" id="L220">    <span class="tok-comment">/// Writes the string to JSON</span></span>
+<span class="line" id="L221">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">toJson</span>(self: *<span class="tok-kw">const</span> Self, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">usize</span> {</span>
+<span class="line" id="L222">        <span class="tok-kw">return</span> json.JsonWriter.writeString(self.raw, writer);</span>
+<span class="line" id="L223">    }</span>
+<span class="line" id="L224"></span>
+<span class="line" id="L225">    <span class="tok-comment">/// Format helper</span></span>
+<span class="line" id="L226">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">format</span>(self: Self, <span class="tok-kw">comptime</span> _: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, _: std.fmt.FormatOptions, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L227">        <span class="tok-kw">return</span> writer.print(<span class="tok-str">&quot;{s}&quot;</span>, .{self.raw});</span>
+<span class="line" id="L228">    }</span>
+<span class="line" id="L229">};</span>
+<span class="line" id="L230"></span>
+<span class="line" id="L231"><span class="tok-comment">/// Utility type which emits an empty array &quot;[]&quot; to the JsonWriter</span></span>
+<span class="line" id="L232"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> EmptyArray = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L233">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">toJson</span>(self: *<span class="tok-kw">const</span> EmptyArray, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">usize</span> {</span>
+<span class="line" id="L234">        _ = self;</span>
+<span class="line" id="L235">        <span class="tok-kw">return</span> json.JsonWriter.writeLiteral(<span class="tok-str">&quot;[]&quot;</span>, writer);</span>
+<span class="line" id="L236">    }</span>
+<span class="line" id="L237">};</span>
+<span class="line" id="L238"></span>
+<span class="line" id="L239"><span class="tok-comment">/// Represents an ABI type. Requires heap allocation as the size of the type can be dynamic (e.g. uint256[3][4]).</span></span>
+<span class="line" id="L240"><span class="tok-comment">/// Reference: https://docs.soliditylang.org/en/v0.8.2/abi-spec.html#types</span></span>
+<span class="line" id="L241"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> AbiType = <span class="tok-kw">union</span>(<span class="tok-kw">enum</span>) {</span>
+<span class="line" id="L242">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L243"></span>
+<span class="line" id="L244">    <span class="tok-comment">// Common typedefs</span>
+</span>
+<span class="line" id="L245">    <span class="tok-kw">pub</span> <span class="tok-kw">const</span> uint256 = Self{ .uint = .{ .bits = <span class="tok-number">256</span> } };</span>
+<span class="line" id="L246">    <span class="tok-kw">pub</span> <span class="tok-kw">const</span> uint8 = Self{ .uint = .{ .bits = <span class="tok-number">8</span> } };</span>
+<span class="line" id="L247">    <span class="tok-kw">pub</span> <span class="tok-kw">const</span> int256 = Self{ .int = .{ .bits = <span class="tok-number">256</span> } };</span>
+<span class="line" id="L248">    <span class="tok-kw">pub</span> <span class="tok-kw">const</span> address = Self{ .address = <span class="tok-type">void</span>{} };</span>
+<span class="line" id="L249"></span>
+<span class="line" id="L250">    <span class="tok-comment">/// uint&lt;M&gt;</span></span>
+<span class="line" id="L251">    uint: <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L252">        bits: <span class="tok-type">u16</span>,</span>
+<span class="line" id="L253">    },</span>
+<span class="line" id="L254">    <span class="tok-comment">/// int&lt;M&gt;</span></span>
+<span class="line" id="L255">    int: <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L256">        bits: <span class="tok-type">u16</span>,</span>
+<span class="line" id="L257">    },</span>
+<span class="line" id="L258">    <span class="tok-comment">/// address</span></span>
+<span class="line" id="L259">    address: <span class="tok-type">void</span>,</span>
+<span class="line" id="L260">    <span class="tok-comment">/// bool</span></span>
+<span class="line" id="L261">    boolean: <span class="tok-type">void</span>,</span>
+<span class="line" id="L262">    <span class="tok-comment">/// ufixed&lt;M&gt;x&lt;N&gt;</span></span>
+<span class="line" id="L263">    fixed_uint: <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L264">        int_bits: <span class="tok-type">u8</span>,</span>
+<span class="line" id="L265">        frac_bits: <span class="tok-type">u8</span>,</span>
+<span class="line" id="L266">    },</span>
+<span class="line" id="L267">    <span class="tok-comment">/// fixed&lt;M&gt;x&lt;N&gt;</span></span>
+<span class="line" id="L268">    fixed_int: <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L269">        int_bits: <span class="tok-type">u8</span>,</span>
+<span class="line" id="L270">        frac_bits: <span class="tok-type">u8</span>,</span>
+<span class="line" id="L271">    },</span>
+<span class="line" id="L272">    <span class="tok-comment">/// bytes&lt;M&gt;</span></span>
+<span class="line" id="L273">    fixed_bytes: <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L274">        size: <span class="tok-type">u8</span>,</span>
+<span class="line" id="L275">    },</span>
+<span class="line" id="L276">    <span class="tok-comment">/// &lt;type&gt;[M]</span></span>
+<span class="line" id="L277">    fixed_array: <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L278">        size: <span class="tok-type">u16</span>,</span>
+<span class="line" id="L279">        child: *AbiType,</span>
+<span class="line" id="L280">    },</span>
+<span class="line" id="L281">    <span class="tok-comment">/// &lt;type&gt;[]</span></span>
+<span class="line" id="L282">    array: *AbiType,</span>
+<span class="line" id="L283">    <span class="tok-comment">/// bytes</span></span>
+<span class="line" id="L284">    bytes: <span class="tok-type">void</span>,</span>
+<span class="line" id="L285">    <span class="tok-comment">/// function</span></span>
+<span class="line" id="L286">    function: <span class="tok-type">void</span>,</span>
+<span class="line" id="L287">    <span class="tok-comment">/// string</span></span>
+<span class="line" id="L288">    string: <span class="tok-type">void</span>,</span>
+<span class="line" id="L289">    <span class="tok-comment">/// (T1,T2,...,Tn)</span></span>
+<span class="line" id="L290">    tuple: []AbiType,</span>
+<span class="line" id="L291"></span>
+<span class="line" id="L292">    <span class="tok-comment">/// Recursively frees memory associated with this type</span></span>
+<span class="line" id="L293">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">deinit</span>(self: *Self, allocator: std.mem.Allocator) <span class="tok-type">void</span> {</span>
+<span class="line" id="L294">        <span class="tok-kw">switch</span> (self.*) {</span>
+<span class="line" id="L295">            .array =&gt; {</span>
+<span class="line" id="L296">                self.array.deinit(allocator);</span>
+<span class="line" id="L297">            },</span>
+<span class="line" id="L298">            .fixed_array =&gt; {</span>
+<span class="line" id="L299">                self.fixed_array.child.deinit(allocator);</span>
+<span class="line" id="L300">            },</span>
+<span class="line" id="L301">            .tuple =&gt; {</span>
+<span class="line" id="L302">                <span class="tok-kw">for</span> (self.tuple) |*child| {</span>
+<span class="line" id="L303">                    child.deinit(allocator);</span>
+<span class="line" id="L304">                }</span>
+<span class="line" id="L305">                allocator.free(self.tuple);</span>
+<span class="line" id="L306">            },</span>
+<span class="line" id="L307">            <span class="tok-kw">else</span> =&gt; {},</span>
+<span class="line" id="L308">        }</span>
+<span class="line" id="L309">        allocator.destroy(self);</span>
+<span class="line" id="L310">    }</span>
+<span class="line" id="L311"></span>
+<span class="line" id="L312">    <span class="tok-comment">/// Format helper</span></span>
+<span class="line" id="L313">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">format</span>(self: Self, <span class="tok-kw">comptime</span> fmt: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, opts: std.fmt.FormatOptions, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L314">        <span class="tok-kw">switch</span> (self) {</span>
+<span class="line" id="L315">            .uint =&gt; |uint| {</span>
+<span class="line" id="L316">                _ = <span class="tok-kw">try</span> writer.write(<span class="tok-str">&quot;uint&quot;</span>);</span>
+<span class="line" id="L317">                <span class="tok-kw">try</span> std.fmt.formatInt(uint.bits, <span class="tok-number">10</span>, .lower, .{}, writer);</span>
+<span class="line" id="L318">            },</span>
+<span class="line" id="L319">            .int =&gt; |uint| {</span>
+<span class="line" id="L320">                _ = <span class="tok-kw">try</span> writer.write(<span class="tok-str">&quot;int&quot;</span>);</span>
+<span class="line" id="L321">                <span class="tok-kw">try</span> std.fmt.formatInt(uint.bits, <span class="tok-number">10</span>, .lower, .{}, writer);</span>
+<span class="line" id="L322">            },</span>
+<span class="line" id="L323">            .address =&gt; {</span>
+<span class="line" id="L324">                _ = <span class="tok-kw">try</span> writer.write(<span class="tok-str">&quot;address&quot;</span>);</span>
+<span class="line" id="L325">            },</span>
+<span class="line" id="L326">            .boolean =&gt; {</span>
+<span class="line" id="L327">                _ = <span class="tok-kw">try</span> writer.write(<span class="tok-str">&quot;boolean&quot;</span>);</span>
+<span class="line" id="L328">            },</span>
+<span class="line" id="L329">            .string =&gt; {</span>
+<span class="line" id="L330">                _ = <span class="tok-kw">try</span> writer.write(<span class="tok-str">&quot;string&quot;</span>);</span>
+<span class="line" id="L331">            },</span>
+<span class="line" id="L332">            .array =&gt; |array_t| {</span>
+<span class="line" id="L333">                <span class="tok-kw">try</span> array_t.format(fmt, opts, writer);</span>
+<span class="line" id="L334">                _ = <span class="tok-kw">try</span> writer.write(<span class="tok-str">&quot;[]&quot;</span>);</span>
+<span class="line" id="L335">            },</span>
+<span class="line" id="L336">            .fixed_array =&gt; |fixed_array_t| {</span>
+<span class="line" id="L337">                <span class="tok-kw">try</span> fixed_array_t.child.format(fmt, opts, writer);</span>
+<span class="line" id="L338">                <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">'['</span>);</span>
+<span class="line" id="L339">                <span class="tok-kw">try</span> std.fmt.formatInt(fixed_array_t.size, <span class="tok-number">10</span>, .lower, .{}, writer);</span>
+<span class="line" id="L340">                <span class="tok-kw">try</span> writer.writeByte(<span class="tok-str">']'</span>);</span>
+<span class="line" id="L341">            },</span>
+<span class="line" id="L342">            <span class="tok-kw">else</span> =&gt; <span class="tok-kw">unreachable</span>,</span>
+<span class="line" id="L343">        }</span>
+<span class="line" id="L344">    }</span>
+<span class="line" id="L345"></span>
+<span class="line" id="L346">    <span class="tok-kw">const</span> fixed_types = std.ComptimeStringMap(Self, .{</span>
+<span class="line" id="L347">        .{ <span class="tok-str">&quot;address&quot;</span>, Self{ .address = <span class="tok-type">void</span>{} } },</span>
+<span class="line" id="L348">        .{ <span class="tok-str">&quot;bool&quot;</span>, Self{ .boolean = <span class="tok-type">void</span>{} } },</span>
+<span class="line" id="L349">        .{ <span class="tok-str">&quot;function&quot;</span>, Self{ .function = <span class="tok-type">void</span>{} } },</span>
+<span class="line" id="L350">        .{ <span class="tok-str">&quot;bytes&quot;</span>, Self{ .bytes = <span class="tok-type">void</span>{} } },</span>
+<span class="line" id="L351">        .{ <span class="tok-str">&quot;string&quot;</span>, Self{ .string = <span class="tok-type">void</span>{} } },</span>
+<span class="line" id="L352">    });</span>
+<span class="line" id="L353"></span>
+<span class="line" id="L354">    <span class="tok-comment">/// Parses the provided string and allocates an AbiType based on its contents</span></span>
+<span class="line" id="L355">    <span class="tok-comment">/// Caller should call `deinit` to recursively free memory</span></span>
+<span class="line" id="L356">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">fromStringAlloc</span>(allocator: std.mem.Allocator, buffer: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !*Self {</span>
+<span class="line" id="L357">        <span class="tok-kw">var</span> child = <span class="tok-kw">try</span> allocator.create(AbiType);</span>
+<span class="line" id="L358"></span>
+<span class="line" id="L359">        <span class="tok-kw">var</span> array_start: <span class="tok-type">usize</span> = <span class="tok-number">0</span>;</span>
+<span class="line" id="L360">        <span class="tok-kw">var</span> child_buffer = buffer;</span>
+<span class="line" id="L361"></span>
+<span class="line" id="L362">        <span class="tok-kw">for</span> (<span class="tok-number">0</span>..buffer.len) |c| {</span>
+<span class="line" id="L363">            <span class="tok-kw">if</span> (buffer[c] == <span class="tok-str">'['</span>) {</span>
+<span class="line" id="L364">                array_start = c;</span>
+<span class="line" id="L365">                child_buffer = buffer[<span class="tok-number">0</span>..c];</span>
+<span class="line" id="L366">                <span class="tok-kw">break</span>;</span>
+<span class="line" id="L367">            }</span>
+<span class="line" id="L368">        }</span>
+<span class="line" id="L369"></span>
+<span class="line" id="L370">        <span class="tok-kw">if</span> (child_buffer.len &gt;= <span class="tok-number">4</span> <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, child_buffer[<span class="tok-number">0</span>..<span class="tok-number">4</span>], <span class="tok-str">&quot;uint&quot;</span>)) {</span>
+<span class="line" id="L371">            <span class="tok-kw">if</span> (child_buffer.len == <span class="tok-number">4</span>) {</span>
+<span class="line" id="L372">                child.* = Self{ .uint = .{ .bits = <span class="tok-number">256</span> } };</span>
+<span class="line" id="L373">            } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L374">                <span class="tok-kw">var</span> bits = <span class="tok-kw">try</span> std.fmt.parseInt(<span class="tok-type">u16</span>, child_buffer[<span class="tok-number">4</span>..], <span class="tok-number">10</span>);</span>
+<span class="line" id="L375">                child.* = Self{ .uint = .{ .bits = bits } };</span>
+<span class="line" id="L376">            }</span>
+<span class="line" id="L377">        } <span class="tok-kw">else</span> <span class="tok-kw">if</span> (child_buffer.len &gt;= <span class="tok-number">3</span> <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, child_buffer[<span class="tok-number">0</span>..<span class="tok-number">3</span>], <span class="tok-str">&quot;int&quot;</span>)) {</span>
+<span class="line" id="L378">            <span class="tok-kw">if</span> (child_buffer.len == <span class="tok-number">3</span>) {</span>
+<span class="line" id="L379">                child.* = Self{ .int = .{ .bits = <span class="tok-number">256</span> } };</span>
+<span class="line" id="L380">            } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L381">                <span class="tok-kw">var</span> bits = <span class="tok-kw">try</span> std.fmt.parseInt(<span class="tok-type">u16</span>, child_buffer[<span class="tok-number">3</span>..], <span class="tok-number">10</span>);</span>
+<span class="line" id="L382">                child.* = Self{ .int = .{ .bits = bits } };</span>
+<span class="line" id="L383">            }</span>
+<span class="line" id="L384">        } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L385">            <span class="tok-kw">var</span> found = <span class="tok-null">false</span>;</span>
+<span class="line" id="L386">            <span class="tok-kw">inline</span> <span class="tok-kw">for</span> (fixed_types.kvs) |fixed_type| {</span>
+<span class="line" id="L387">                <span class="tok-kw">if</span> (child_buffer.len == fixed_type.key.len <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, child_buffer[<span class="tok-number">0</span>..fixed_type.key.len], fixed_type.key)) {</span>
+<span class="line" id="L388">                    child.* = fixed_type.value;</span>
+<span class="line" id="L389">                    found = <span class="tok-null">true</span>;</span>
+<span class="line" id="L390">                    <span class="tok-kw">break</span>;</span>
+<span class="line" id="L391">                }</span>
+<span class="line" id="L392">            }</span>
+<span class="line" id="L393"></span>
+<span class="line" id="L394">            <span class="tok-kw">if</span> (!found) {</span>
+<span class="line" id="L395">                allocator.destroy(child);</span>
+<span class="line" id="L396">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.UnknownType;</span>
+<span class="line" id="L397">            }</span>
+<span class="line" id="L398">        }</span>
+<span class="line" id="L399"></span>
+<span class="line" id="L400">        <span class="tok-kw">if</span> (array_start == <span class="tok-number">0</span>) {</span>
+<span class="line" id="L401">            <span class="tok-kw">return</span> child;</span>
+<span class="line" id="L402">        }</span>
+<span class="line" id="L403"></span>
+<span class="line" id="L404">        <span class="tok-kw">var</span> array_end = array_start;</span>
+<span class="line" id="L405"></span>
+<span class="line" id="L406">        <span class="tok-kw">while</span> (array_end != buffer.len) : (array_end += <span class="tok-number">1</span>) {</span>
+<span class="line" id="L407">            array_start = array_end;</span>
+<span class="line" id="L408"></span>
+<span class="line" id="L409">            <span class="tok-kw">if</span> (buffer[array_end] != <span class="tok-str">'['</span>) {</span>
+<span class="line" id="L410">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ParserError;</span>
+<span class="line" id="L411">            }</span>
+<span class="line" id="L412"></span>
+<span class="line" id="L413">            array_end += <span class="tok-number">1</span>;</span>
+<span class="line" id="L414"></span>
+<span class="line" id="L415">            <span class="tok-kw">for</span> (array_end..buffer.len) |c| {</span>
+<span class="line" id="L416">                <span class="tok-kw">if</span> (buffer[c] == <span class="tok-str">']'</span>) {</span>
+<span class="line" id="L417">                    array_end = c;</span>
+<span class="line" id="L418">                    <span class="tok-kw">break</span>;</span>
+<span class="line" id="L419">                }</span>
+<span class="line" id="L420">            }</span>
+<span class="line" id="L421"></span>
+<span class="line" id="L422">            <span class="tok-kw">if</span> (array_end == array_start) {</span>
+<span class="line" id="L423">                allocator.destroy(child);</span>
+<span class="line" id="L424">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ParserError;</span>
+<span class="line" id="L425">            }</span>
+<span class="line" id="L426"></span>
+<span class="line" id="L427">            <span class="tok-kw">if</span> (array_end == array_start + <span class="tok-number">1</span>) {</span>
+<span class="line" id="L428">                <span class="tok-comment">// Dynamic array</span>
+</span>
+<span class="line" id="L429">                <span class="tok-kw">var</span> array_type = <span class="tok-kw">try</span> allocator.create(AbiType);</span>
+<span class="line" id="L430">                array_type.* = Self{</span>
+<span class="line" id="L431">                    .array = child,</span>
+<span class="line" id="L432">                };</span>
+<span class="line" id="L433">                child = array_type;</span>
+<span class="line" id="L434">            } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L435">                <span class="tok-comment">// Fixed length array</span>
+</span>
+<span class="line" id="L436">                <span class="tok-kw">const</span> size = <span class="tok-kw">try</span> std.fmt.parseInt(<span class="tok-type">u16</span>, buffer[array_start + <span class="tok-number">1</span> .. array_end], <span class="tok-number">10</span>);</span>
+<span class="line" id="L437"></span>
+<span class="line" id="L438">                <span class="tok-kw">var</span> array_type = <span class="tok-kw">try</span> allocator.create(AbiType);</span>
+<span class="line" id="L439">                array_type.* = Self{ .fixed_array = .{</span>
+<span class="line" id="L440">                    .size = size,</span>
+<span class="line" id="L441">                    .child = child,</span>
+<span class="line" id="L442">                } };</span>
+<span class="line" id="L443">                child = array_type;</span>
+<span class="line" id="L444">            }</span>
+<span class="line" id="L445">        }</span>
+<span class="line" id="L446"></span>
+<span class="line" id="L447">        <span class="tok-kw">return</span> child;</span>
+<span class="line" id="L448">    }</span>
+<span class="line" id="L449">};</span>
+<span class="line" id="L450"></span>
+<span class="line" id="L451"><span class="tok-comment">/// Stores data used to submit a transaction to a provider</span></span>
+<span class="line" id="L452"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> TransactionRequest = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L453">    from: Address,</span>
+<span class="line" id="L454">    to: ?Address = <span class="tok-null">null</span>,</span>
+<span class="line" id="L455">    gas: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L456">    gas_price: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L457">    max_priority_fee_per_gas: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L458">    max_fee_per_gas: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L459">    value: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L460">    data: ?[]<span class="tok-kw">const</span> <span class="tok-type">u8</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L461"></span>
+<span class="line" id="L462">    <span class="tok-comment">/// Deallocates owned memory</span></span>
+<span class="line" id="L463">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">deinit</span>(self: TransactionRequest, allocator: std.mem.Allocator) <span class="tok-type">void</span> {</span>
+<span class="line" id="L464">        <span class="tok-kw">if</span> (self.data) |data| {</span>
+<span class="line" id="L465">            allocator.free(data);</span>
+<span class="line" id="L466">        }</span>
+<span class="line" id="L467">    }</span>
+<span class="line" id="L468">};</span>
+<span class="line" id="L469"></span>
+<span class="line" id="L470"><span class="tok-comment">/// Represents a pending or mined transaction on Ethereum</span></span>
+<span class="line" id="L471"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> Transaction = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L472">    block_hash: ?Hash,</span>
+<span class="line" id="L473">    block_number: ?<span class="tok-type">u64</span>,</span>
+<span class="line" id="L474">    from: Address,</span>
+<span class="line" id="L475">    gas: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L476">    gas_price: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L477">    max_priority_fee_per_gas: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L478">    max_fee_per_gas: ?<span class="tok-type">u256</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L479">    hash: Hash,</span>
+<span class="line" id="L480">    input: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
+<span class="line" id="L481">    to: Address,</span>
+<span class="line" id="L482">    transaction_index: <span class="tok-type">u32</span>,</span>
+<span class="line" id="L483">    value: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L484">    v: <span class="tok-type">u8</span>,</span>
+<span class="line" id="L485">    r: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L486">    s: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L487"></span>
+<span class="line" id="L488">    <span class="tok-comment">/// Deallocates owned memory</span></span>
+<span class="line" id="L489">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">deinit</span>(self: Transaction, allocator: std.mem.Allocator) <span class="tok-type">void</span> {</span>
+<span class="line" id="L490">        allocator.free(self.input);</span>
+<span class="line" id="L491">    }</span>
+<span class="line" id="L492">};</span>
+<span class="line" id="L493"></span>
+<span class="line" id="L494"><span class="tok-comment">/// Represents an Ethereum transaction receipt</span></span>
+<span class="line" id="L495"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> TransactionReceipt = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L496">    transaction_hash: Hash,</span>
+<span class="line" id="L497">    transaction_index: <span class="tok-type">u32</span>,</span>
+<span class="line" id="L498">    block_hash: Hash,</span>
+<span class="line" id="L499">    block_number: <span class="tok-type">u64</span>,</span>
+<span class="line" id="L500">    from: Address,</span>
+<span class="line" id="L501">    to: Address,</span>
+<span class="line" id="L502">    cumulative_gas_used: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L503">    effective_gas_price: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L504">    gasUsed: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L505">    contract_address: ?Address,</span>
+<span class="line" id="L506">    logs: []Log,</span>
+<span class="line" id="L507">    logs_bloom: FixedDataHexString(<span class="tok-number">256</span>),</span>
+<span class="line" id="L508">    <span class="tok-type">type</span>: <span class="tok-type">u8</span>,</span>
+<span class="line" id="L509">    status: <span class="tok-type">u8</span>,</span>
+<span class="line" id="L510"></span>
+<span class="line" id="L511">    <span class="tok-comment">/// Deallocates owned memory</span></span>
+<span class="line" id="L512">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">deinit</span>(self: *TransactionReceipt, allocator: std.mem.Allocator) <span class="tok-type">void</span> {</span>
+<span class="line" id="L513">        <span class="tok-kw">for</span> (self.logs) |*log| {</span>
+<span class="line" id="L514">            log.deinit(allocator);</span>
+<span class="line" id="L515">        }</span>
+<span class="line" id="L516">        allocator.free(self.logs);</span>
+<span class="line" id="L517">    }</span>
+<span class="line" id="L518">};</span>
+<span class="line" id="L519"></span>
+<span class="line" id="L520"><span class="tok-comment">/// Represents an Ethereum log</span></span>
+<span class="line" id="L521"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> Log = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L522">    removed: <span class="tok-type">bool</span>,</span>
+<span class="line" id="L523">    log_index: ?<span class="tok-type">u32</span>,</span>
+<span class="line" id="L524">    transaction_index: ?<span class="tok-type">u32</span>,</span>
+<span class="line" id="L525">    transaction_hash: ?Hash,</span>
+<span class="line" id="L526">    block_hash: ?Hash,</span>
+<span class="line" id="L527">    block_number: ?<span class="tok-type">u64</span>,</span>
+<span class="line" id="L528">    address: Address,</span>
+<span class="line" id="L529">    data: DataHexString,</span>
+<span class="line" id="L530">    topics: []Hash,</span>
+<span class="line" id="L531"></span>
+<span class="line" id="L532">    <span class="tok-comment">/// Frees owned memory</span></span>
+<span class="line" id="L533">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">deinit</span>(self: *Log, allocator: std.mem.Allocator) <span class="tok-type">void</span> {</span>
+<span class="line" id="L534">        self.data.deinit(allocator);</span>
+<span class="line" id="L535">        allocator.free(self.topics);</span>
+<span class="line" id="L536">    }</span>
+<span class="line" id="L537">};</span>
+<span class="line" id="L538"></span>
+<span class="line" id="L539"><span class="tok-comment">/// Utility wrapper around a dynamic array of Logs</span></span>
+<span class="line" id="L540"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> Logs = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L541">    raw: []Log,</span>
+<span class="line" id="L542"></span>
+<span class="line" id="L543">    <span class="tok-comment">/// Frees owned memory</span></span>
+<span class="line" id="L544">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">deinit</span>(self: Logs, allocator: std.mem.Allocator) <span class="tok-type">void</span> {</span>
+<span class="line" id="L545">        <span class="tok-kw">for</span> (self.raw) |*log| {</span>
+<span class="line" id="L546">            log.deinit(allocator);</span>
+<span class="line" id="L547">        }</span>
+<span class="line" id="L548">        allocator.free(self.raw);</span>
+<span class="line" id="L549">    }</span>
+<span class="line" id="L550">};</span>
+<span class="line" id="L551"></span>
+<span class="line" id="L552"><span class="tok-comment">/// Represents an Ethereum block. There are two versions of this type,</span></span>
+<span class="line" id="L553"><span class="tok-comment">/// one where the transactions field is an array of hashes and another</span></span>
+<span class="line" id="L554"><span class="tok-comment">/// where the transactions field is an array of Transaction structs</span></span>
+<span class="line" id="L555"><span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">Block</span>(<span class="tok-kw">comptime</span> full_transactions: <span class="tok-type">bool</span>) <span class="tok-type">type</span> {</span>
+<span class="line" id="L556">    <span class="tok-kw">const</span> TransactionType = <span class="tok-kw">if</span> (full_transactions) Transaction <span class="tok-kw">else</span> Hash;</span>
+<span class="line" id="L557"></span>
+<span class="line" id="L558">    <span class="tok-kw">return</span> <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L559">        <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L560"></span>
+<span class="line" id="L561">        difficulty: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L562">        extra_data: DataHexString,</span>
+<span class="line" id="L563">        gas_limit: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L564">        gas_used: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L565">        hash: ?Hash,</span>
+<span class="line" id="L566">        logs_bloom: FixedDataHexString(<span class="tok-number">256</span>),</span>
+<span class="line" id="L567">        miner: Address,</span>
+<span class="line" id="L568">        mix_hash: Hash,</span>
+<span class="line" id="L569">        nonce: ?FixedDataHexString(<span class="tok-number">8</span>),</span>
+<span class="line" id="L570">        number: ?<span class="tok-type">u64</span>,</span>
+<span class="line" id="L571">        parent_hash: Hash,</span>
+<span class="line" id="L572">        receipts_root: Hash,</span>
+<span class="line" id="L573">        sha3_uncles: Hash,</span>
+<span class="line" id="L574">        size: <span class="tok-type">u64</span>,</span>
+<span class="line" id="L575">        state_root: Hash,</span>
+<span class="line" id="L576">        timestamp: <span class="tok-type">u64</span>,</span>
+<span class="line" id="L577">        total_difficulty: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L578">        transactions_root: Hash,</span>
+<span class="line" id="L579">        withdrawals_root: Hash,</span>
+<span class="line" id="L580">        transactions: []TransactionType,</span>
+<span class="line" id="L581">        uncles: []Hash,</span>
+<span class="line" id="L582">        withdrawals: []<span class="tok-kw">struct</span> {</span>
+<span class="line" id="L583">            index: <span class="tok-type">u64</span>,</span>
+<span class="line" id="L584">            validator_index: <span class="tok-type">u64</span>,</span>
+<span class="line" id="L585">            address: Address,</span>
+<span class="line" id="L586">            amount: <span class="tok-type">u64</span>,</span>
+<span class="line" id="L587">        },</span>
+<span class="line" id="L588"></span>
+<span class="line" id="L589">        <span class="tok-comment">/// Deallocates owned memory</span></span>
+<span class="line" id="L590">        <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">deinit</span>(self: Self, allocator: std.mem.Allocator) <span class="tok-type">void</span> {</span>
+<span class="line" id="L591">            self.extra_data.deinit(allocator);</span>
+<span class="line" id="L592">            <span class="tok-kw">if</span> (full_transactions) {</span>
+<span class="line" id="L593">                <span class="tok-kw">for</span> (self.transactions) |tx| {</span>
+<span class="line" id="L594">                    tx.deinit(allocator);</span>
+<span class="line" id="L595">                }</span>
+<span class="line" id="L596">            }</span>
+<span class="line" id="L597">            allocator.free(self.transactions);</span>
+<span class="line" id="L598">            allocator.free(self.uncles);</span>
+<span class="line" id="L599">            allocator.free(self.withdrawals);</span>
+<span class="line" id="L600">        }</span>
+<span class="line" id="L601">    };</span>
+<span class="line" id="L602">}</span>
+<span class="line" id="L603"></span>
+<span class="line" id="L604"><span class="tok-comment">/// Information about the sync status of an execution client</span></span>
+<span class="line" id="L605"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> SyncData = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L606">    starting_block: ?<span class="tok-type">u64</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L607">    current_block: ?<span class="tok-type">u64</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L608">    highest_block: ?<span class="tok-type">u64</span> = <span class="tok-null">null</span>,</span>
+<span class="line" id="L609">};</span>
+<span class="line" id="L610"></span>
+<span class="line" id="L611"><span class="tok-comment">/// Whether an execution client is syncing and if so, information about</span></span>
+<span class="line" id="L612"><span class="tok-comment">/// its current status</span></span>
+<span class="line" id="L613"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> SyncStatus = <span class="tok-kw">union</span>(<span class="tok-kw">enum</span>) {</span>
+<span class="line" id="L614">    not_syncing: <span class="tok-type">void</span>,</span>
+<span class="line" id="L615">    syncing: SyncData,</span>
+<span class="line" id="L616">};</span>
+<span class="line" id="L617"></span>
+<span class="line" id="L618"><span class="tok-comment">/// Refers to a block tag (&quot;latest&quot;, &quot;earliest&quot;, &quot;pending&quot;) or a specific block number</span></span>
+<span class="line" id="L619"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> BlockTag = <span class="tok-kw">union</span>(<span class="tok-kw">enum</span>) {</span>
+<span class="line" id="L620">    number: <span class="tok-type">u64</span>,</span>
+<span class="line" id="L621">    tag: <span class="tok-kw">enum</span> { earliest, latest, safe, finalized, pending },</span>
+<span class="line" id="L622">};</span>
+<span class="line" id="L623"></span>
+<span class="line" id="L624"><span class="tok-comment">/// Represents a dynamic array of bytes encoded as a hex string</span></span>
+<span class="line" id="L625"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> DataHexString = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L626">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L627"></span>
+<span class="line" id="L628">    raw: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
+<span class="line" id="L629"></span>
+<span class="line" id="L630">    <span class="tok-comment">/// Frees the wrapped memory</span></span>
+<span class="line" id="L631">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">deinit</span>(self: Self, allocator: std.mem.Allocator) <span class="tok-type">void</span> {</span>
+<span class="line" id="L632">        allocator.free(self.raw);</span>
+<span class="line" id="L633">    }</span>
+<span class="line" id="L634"></span>
+<span class="line" id="L635">    <span class="tok-comment">/// Parses a hex string from a buffer and allocates memory to hold the result</span></span>
+<span class="line" id="L636">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">fromStringAlloc</span>(allocator: std.mem.Allocator, str: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !Self {</span>
+<span class="line" id="L637">        <span class="tok-kw">var</span> _str = str;</span>
+<span class="line" id="L638"></span>
+<span class="line" id="L639">        <span class="tok-kw">if</span> (str.len &gt;= <span class="tok-number">2</span> <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, str[<span class="tok-number">0</span>..<span class="tok-number">2</span>], <span class="tok-str">&quot;0x&quot;</span>)) {</span>
+<span class="line" id="L640">            _str = _str[<span class="tok-number">2</span>..];</span>
+<span class="line" id="L641">        }</span>
+<span class="line" id="L642"></span>
+<span class="line" id="L643">        <span class="tok-kw">var</span> self = Self{</span>
+<span class="line" id="L644">            .raw = <span class="tok-kw">try</span> allocator.alloc(<span class="tok-type">u8</span>, _str.len / <span class="tok-number">2</span>),</span>
+<span class="line" id="L645">        };</span>
+<span class="line" id="L646"></span>
+<span class="line" id="L647">        <span class="tok-kw">if</span> (_str.len &gt; <span class="tok-number">0</span>) {</span>
+<span class="line" id="L648">            _ = <span class="tok-kw">try</span> std.fmt.hexToBytes(<span class="tok-builtin">@constCast</span>(self.raw[<span class="tok-number">0</span>..]), _str);</span>
+<span class="line" id="L649">        }</span>
+<span class="line" id="L650"></span>
+<span class="line" id="L651">        <span class="tok-kw">return</span> self;</span>
+<span class="line" id="L652">    }</span>
+<span class="line" id="L653"></span>
+<span class="line" id="L654">    <span class="tok-comment">/// Writes the wrapped byte array to JSON</span></span>
+<span class="line" id="L655">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">toJson</span>(self: *<span class="tok-kw">const</span> Self, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">usize</span> {</span>
+<span class="line" id="L656">        <span class="tok-kw">return</span> json.JsonWriter.write(self.raw, writer);</span>
+<span class="line" id="L657">    }</span>
+<span class="line" id="L658"></span>
+<span class="line" id="L659">    <span class="tok-comment">/// Format helper</span></span>
+<span class="line" id="L660">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">format</span>(self: Self, <span class="tok-kw">comptime</span> _: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, _: std.fmt.FormatOptions, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L661">        <span class="tok-kw">return</span> writer.print(<span class="tok-str">&quot;0x{}&quot;</span>, .{std.fmt.fmtSliceHexLower(self.raw[<span class="tok-number">0</span>..])});</span>
+<span class="line" id="L662">    }</span>
+<span class="line" id="L663">};</span>
+<span class="line" id="L664"></span>
+<span class="line" id="L665"><span class="tok-comment">/// Represents a fixed sized array of bytes encoded in a hex string</span></span>
+<span class="line" id="L666"><span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">FixedDataHexString</span>(<span class="tok-kw">comptime</span> size: <span class="tok-type">comptime_int</span>) <span class="tok-type">type</span> {</span>
+<span class="line" id="L667">    <span class="tok-kw">return</span> <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L668">        <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L669"></span>
+<span class="line" id="L670">        raw: [size]<span class="tok-type">u8</span>,</span>
+<span class="line" id="L671"></span>
+<span class="line" id="L672">        <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">wrap</span>(raw: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) Self {</span>
+<span class="line" id="L673">            <span class="tok-kw">var</span> self: Self = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L674">            <span class="tok-builtin">@memcpy</span>(&amp;self.raw, raw[<span class="tok-number">0</span>..size]);</span>
+<span class="line" id="L675">            <span class="tok-kw">return</span> self;</span>
+<span class="line" id="L676">        }</span>
+<span class="line" id="L677"></span>
+<span class="line" id="L678">        <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">fromString</span>(str: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !Self {</span>
+<span class="line" id="L679">            <span class="tok-kw">var</span> _str = str;</span>
+<span class="line" id="L680"></span>
+<span class="line" id="L681">            <span class="tok-kw">if</span> (str.len &gt;= <span class="tok-number">2</span> <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, str[<span class="tok-number">0</span>..<span class="tok-number">2</span>], <span class="tok-str">&quot;0x&quot;</span>)) {</span>
+<span class="line" id="L682">                _str = _str[<span class="tok-number">2</span>..];</span>
+<span class="line" id="L683">            }</span>
+<span class="line" id="L684"></span>
+<span class="line" id="L685">            <span class="tok-kw">var</span> self: Self = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L686"></span>
+<span class="line" id="L687">            <span class="tok-kw">if</span> (_str.len &gt; <span class="tok-number">0</span>) {</span>
+<span class="line" id="L688">                _ = <span class="tok-kw">try</span> std.fmt.hexToBytes(self.raw[<span class="tok-number">0</span>..], _str);</span>
+<span class="line" id="L689">            }</span>
+<span class="line" id="L690"></span>
+<span class="line" id="L691">            <span class="tok-kw">return</span> self;</span>
+<span class="line" id="L692">        }</span>
+<span class="line" id="L693"></span>
+<span class="line" id="L694">        <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">toJson</span>(self: *<span class="tok-kw">const</span> Self, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">usize</span> {</span>
+<span class="line" id="L695">            <span class="tok-kw">return</span> json.JsonWriter.write(&amp;self.raw, writer);</span>
+<span class="line" id="L696">        }</span>
+<span class="line" id="L697"></span>
+<span class="line" id="L698">        <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">format</span>(self: Self, <span class="tok-kw">comptime</span> _: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, _: std.fmt.FormatOptions, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L699">            <span class="tok-kw">return</span> writer.print(<span class="tok-str">&quot;0x{}&quot;</span>, .{std.fmt.fmtSliceHexLower(self.raw[<span class="tok-number">0</span>..])});</span>
+<span class="line" id="L700">        }</span>
+<span class="line" id="L701">    };</span>
+<span class="line" id="L702">}</span>
+<span class="line" id="L703"></span>
+<span class="line" id="L704"><span class="tok-comment">/// A 32 byte hash. Type def of FixedDataHexString(32)</span></span>
+<span class="line" id="L705"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> Hash = FixedDataHexString(<span class="tok-number">32</span>);</span>
+<span class="line" id="L706"></span>
+<span class="line" id="L707"><span class="tok-comment">/// Represents an integer encoded into a hex string</span></span>
+<span class="line" id="L708"><span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">IntHexString</span>(<span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>) <span class="tok-type">type</span> {</span>
+<span class="line" id="L709">    <span class="tok-kw">return</span> <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L710">        <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L711"></span>
+<span class="line" id="L712">        raw: T,</span>
+<span class="line" id="L713"></span>
+<span class="line" id="L714">        <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">wrap</span>(val: T) Self {</span>
+<span class="line" id="L715">            <span class="tok-kw">return</span> Self{</span>
+<span class="line" id="L716">                .raw = val,</span>
+<span class="line" id="L717">            };</span>
+<span class="line" id="L718">        }</span>
+<span class="line" id="L719"></span>
+<span class="line" id="L720">        <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">fromString</span>(str: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !Self {</span>
+<span class="line" id="L721">            <span class="tok-kw">var</span> _str = str;</span>
+<span class="line" id="L722"></span>
+<span class="line" id="L723">            <span class="tok-kw">if</span> (str.len &gt;= <span class="tok-number">2</span> <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, str[<span class="tok-number">0</span>..<span class="tok-number">2</span>], <span class="tok-str">&quot;0x&quot;</span>)) {</span>
+<span class="line" id="L724">                _str = _str[<span class="tok-number">2</span>..];</span>
+<span class="line" id="L725">            }</span>
+<span class="line" id="L726"></span>
+<span class="line" id="L727">            <span class="tok-kw">if</span> (_str.len &gt; <span class="tok-number">0</span>) {</span>
+<span class="line" id="L728">                <span class="tok-kw">return</span> Self{</span>
+<span class="line" id="L729">                    .raw = <span class="tok-kw">try</span> std.fmt.parseInt(T, _str, <span class="tok-number">16</span>),</span>
+<span class="line" id="L730">                };</span>
+<span class="line" id="L731">            }</span>
+<span class="line" id="L732"></span>
+<span class="line" id="L733">            <span class="tok-kw">return</span> Self{ .raw = <span class="tok-number">0</span> };</span>
+<span class="line" id="L734">        }</span>
+<span class="line" id="L735"></span>
+<span class="line" id="L736">        <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">toJson</span>(self: *<span class="tok-kw">const</span> Self, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">usize</span> {</span>
+<span class="line" id="L737">            <span class="tok-kw">return</span> json.JsonWriter.write(self.raw, writer);</span>
+<span class="line" id="L738">        }</span>
+<span class="line" id="L739"></span>
+<span class="line" id="L740">        <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">format</span>(self: Self, <span class="tok-kw">comptime</span> _: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, _: std.fmt.FormatOptions, writer: <span class="tok-kw">anytype</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L741">            <span class="tok-kw">try</span> writer.print(<span class="tok-str">&quot;{}&quot;</span>, .{self.raw});</span>
+<span class="line" id="L742">        }</span>
+<span class="line" id="L743">    };</span>
+<span class="line" id="L744">}</span>
+<span class="line" id="L745"></span>
+<span class="line" id="L746"><span class="tok-kw">test</span> <span class="tok-str">&quot;fixed point&quot;</span> {</span>
+<span class="line" id="L747">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
+<span class="line" id="L748"></span>
+<span class="line" id="L749">    {</span>
+<span class="line" id="L750">        <span class="tok-kw">const</span> one_hundred_fp2 = FixedPoint(<span class="tok-number">2</span>, <span class="tok-type">u64</span>).wrap(<span class="tok-number">10000</span>);</span>
+<span class="line" id="L751">        <span class="tok-kw">const</span> two_hundred_fp2 = FixedPoint(<span class="tok-number">2</span>, <span class="tok-type">u64</span>).wrap(<span class="tok-number">20000</span>);</span>
+<span class="line" id="L752">        <span class="tok-kw">const</span> two_fp2 = FixedPoint(<span class="tok-number">2</span>, <span class="tok-type">u64</span>).wrap(<span class="tok-number">200</span>);</span>
+<span class="line" id="L753"></span>
+<span class="line" id="L754">        assert(one_hundred_fp2.mul(<span class="tok-number">2</span>).eql(two_hundred_fp2));</span>
+<span class="line" id="L755">        assert(one_hundred_fp2.mul(two_fp2).eql(two_hundred_fp2));</span>
+<span class="line" id="L756">        assert(two_hundred_fp2.div(two_fp2).eql(one_hundred_fp2));</span>
+<span class="line" id="L757">        assert(one_hundred_fp2.add(one_hundred_fp2).eql(two_hundred_fp2));</span>
+<span class="line" id="L758">    }</span>
+<span class="line" id="L759"></span>
+<span class="line" id="L760">    {</span>
+<span class="line" id="L761">        <span class="tok-kw">const</span> neg_one_hundred_fp2 = FixedPoint(<span class="tok-number">2</span>, <span class="tok-type">i64</span>).wrap(-<span class="tok-number">10000</span>);</span>
+<span class="line" id="L762">        <span class="tok-kw">const</span> neg_two_hundred_fp2 = FixedPoint(<span class="tok-number">2</span>, <span class="tok-type">i64</span>).wrap(-<span class="tok-number">20000</span>);</span>
+<span class="line" id="L763">        <span class="tok-kw">const</span> two_fp2 = FixedPoint(<span class="tok-number">2</span>, <span class="tok-type">i64</span>).wrap(<span class="tok-number">200</span>);</span>
+<span class="line" id="L764">        <span class="tok-kw">const</span> zero_fp2 = FixedPoint(<span class="tok-number">2</span>, <span class="tok-type">i64</span>).wrap(<span class="tok-number">0</span>);</span>
+<span class="line" id="L765"></span>
+<span class="line" id="L766">        assert(neg_one_hundred_fp2.mul(<span class="tok-number">2</span>).eql(neg_two_hundred_fp2));</span>
+<span class="line" id="L767">        assert(neg_one_hundred_fp2.mul(two_fp2).eql(neg_two_hundred_fp2));</span>
+<span class="line" id="L768">        assert(neg_two_hundred_fp2.div(two_fp2).eql(neg_one_hundred_fp2));</span>
+<span class="line" id="L769">        assert(neg_one_hundred_fp2.add(neg_one_hundred_fp2).eql(neg_two_hundred_fp2));</span>
+<span class="line" id="L770">        assert(neg_one_hundred_fp2.sub(neg_one_hundred_fp2).eql(zero_fp2));</span>
+<span class="line" id="L771">        assert(neg_one_hundred_fp2.add(neg_one_hundred_fp2.neg()).eql(zero_fp2));</span>
+<span class="line" id="L772">    }</span>
+<span class="line" id="L773">}</span>
+<span class="line" id="L774"></span>
+<span class="line" id="L775"><span class="tok-kw">test</span> <span class="tok-str">&quot;type parsing&quot;</span> {</span>
+<span class="line" id="L776">    <span class="tok-kw">const</span> allocator = std.testing.allocator;</span>
+<span class="line" id="L777">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
+<span class="line" id="L778"></span>
+<span class="line" id="L779">    <span class="tok-kw">const</span> input = <span class="tok-str">&quot;uint256[5][10][]&quot;</span>;</span>
+<span class="line" id="L780"></span>
+<span class="line" id="L781">    <span class="tok-kw">var</span> typ = <span class="tok-kw">try</span> AbiType.fromStringAlloc(allocator, input);</span>
+<span class="line" id="L782">    <span class="tok-kw">defer</span> typ.deinit(allocator);</span>
+<span class="line" id="L783"></span>
+<span class="line" id="L784">    <span class="tok-kw">var</span> output = <span class="tok-kw">try</span> allocator.alloc(<span class="tok-type">u8</span>, input.len);</span>
+<span class="line" id="L785">    <span class="tok-kw">defer</span> allocator.free(output);</span>
+<span class="line" id="L786"></span>
+<span class="line" id="L787">    <span class="tok-kw">var</span> stream = std.io.fixedBufferStream(output);</span>
+<span class="line" id="L788">    <span class="tok-kw">var</span> writer = stream.writer();</span>
+<span class="line" id="L789"></span>
+<span class="line" id="L790">    <span class="tok-kw">try</span> writer.print(<span class="tok-str">&quot;{}&quot;</span>, .{typ});</span>
+<span class="line" id="L791"></span>
+<span class="line" id="L792">    assert(std.mem.eql(<span class="tok-type">u8</span>, output, input));</span>
+<span class="line" id="L793">}</span>
+<span class="line" id="L794"></span>
+</code></pre></body>
+</html>
