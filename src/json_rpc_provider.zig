@@ -7,8 +7,6 @@ const parser_allocator = @import("parser_allocator.zig");
 const INITIAL_RESPONSE_BUFFER_SIZE = 1024;
 const MAX_RESPONSE_BUFFER_SIZE = 1024 * 1024;
 
-var latest = web3.String.wrap("latest");
-
 fn JsonRpcResponse(comptime T: type) type {
     return struct {
         // id: u32,
@@ -26,138 +24,17 @@ const JsonRpcError = struct {
     },
 };
 
-// The following structs are identical versions of the corresponding library type but these
-// structs us the naming convention of the API (i.e. camelCase) so that the parser, which
-// uses comptime reflection, can parse them correctly
-
-// Note: This struct must be identical to `web3.TransactionRequest`
-const JsonTransactionRequest = struct {
-    from: web3.Address,
-    to: ?web3.Address = null,
-    gas: ?u256 = null,
-    gasPrice: ?u256 = null,
-    maxPriorityFeePerGas: ?u256 = null,
-    maxFeePerGas: ?u256 = null,
-    value: ?u256 = null,
-    data: ?[]const u8 = null,
-};
-
-// Note: This struct must be identical to `web3.Transaction`
-const JsonTransaction = struct {
-    blockHash: ?web3.Hash,
-    blockNumber: ?u64,
-    from: web3.Address,
-    gas: u256,
-    gasPrice: ?u256 = null,
-    maxPriorityFeePerGas: ?u256 = null,
-    maxFeePerGas: ?u256 = null,
-    hash: web3.Hash,
-    input: []const u8,
-    to: web3.Address,
-    transactionIndex: u32,
-    value: u256,
-    v: u8,
-    r: u256,
-    s: u256,
-};
-
-// Note: This struct must be identical to `web3.Log`
-const JsonLog = struct {
-    removed: bool,
-    logIndex: ?u32,
-    transactionIndex: ?u32,
-    transactionHash: ?web3.Hash,
-    blockHash: ?web3.Hash,
-    blockNumber: ?u64,
-    address: web3.Address,
-    data: web3.DataHexString,
-    topics: []web3.Hash,
-};
-
-// Note: This struct must be identical to `web3.Logs`
-const JsonLogs = struct {
-    raw: []JsonLog,
-
-    pub fn fromJson(allocator: std.mem.Allocator, buffer: *[]const u8) !JsonLogs {
-        return JsonLogs{
-            .raw = try web3.json.JsonReader.parse(allocator, buffer, []JsonLog),
-        };
-    }
-};
-
-// Note: This struct must be identical to `web3.TransactionReceipt`
-const JsonTransactionReceipt = struct {
-    transactionHash: web3.Hash,
-    transactionIndex: u32,
-    blockHash: web3.Hash,
-    blockNumber: u64,
-    from: web3.Address,
-    to: web3.Address,
-    cumulativeGasUsed: u256,
-    effectiveGasPrice: u256,
-    gasUsed: u256,
-    contractAddress: ?web3.Address,
-    logs: []JsonLog,
-    logsBloom: web3.FixedDataHexString(256),
-    type: u8,
-    status: u8,
-};
-
-// Note: This struct must be identical to `web3.Block`
-fn JsonBlock(comptime full_transactions: bool) type {
-    const TransactionType = if (full_transactions) JsonTransaction else web3.Hash;
-
-    return struct {
-        const Self = @This();
-
-        difficulty: u256,
-        extraData: web3.DataHexString,
-        gasLimit: u256,
-        gasUsed: u256,
-        hash: ?web3.Hash,
-        logsBloom: web3.FixedDataHexString(256),
-        miner: web3.Address,
-        mixHash: web3.Hash,
-        nonce: ?web3.FixedDataHexString(8),
-        number: ?u64,
-        parentHash: web3.Hash,
-        receiptsRoot: web3.Hash,
-        sha3Uncles: web3.Hash,
-        size: u64,
-        stateRoot: web3.Hash,
-        timestamp: u64,
-        totalDifficulty: u256,
-        transactionsRoot: web3.Hash,
-        withdrawalsRoot: web3.Hash,
-        transactions: []TransactionType,
-        uncles: []web3.Hash,
-        withdrawals: []struct {
-            index: u64,
-            validatorIndex: u64,
-            address: web3.Address,
-            amount: u64,
-        },
-    };
-}
-
-// Note: This struct must be identical to `web3.SyncData`
-const JsonSyncData = struct {
-    startingBlock: ?u64 = null,
-    currentBlock: ?u64 = null,
-    highestBlock: ?u64 = null,
-};
-
 // Note: This struct must be identical to `web3.SyncStatus`
 const JsonSyncStatus = union(enum) {
     not_syncing: void,
-    syncing: JsonSyncData,
+    syncing: web3.SyncData,
 
     pub fn fromJson(allocator: std.mem.Allocator, buffer: *[]const u8) !JsonSyncStatus {
         if (buffer.len >= "false".len and std.mem.eql(u8, buffer.*[0.."false".len], "false")) {
             buffer.* = buffer.*["false".len..];
             return JsonSyncStatus{ .not_syncing = void{} };
         } else {
-            const data = try web3.json.JsonReader.parse(allocator, buffer, JsonSyncData);
+            const data = try web3.json.JsonReader.parse(allocator, buffer, web3.SyncData);
             return JsonSyncStatus{
                 .syncing = data,
             };
@@ -167,24 +44,8 @@ const JsonSyncStatus = union(enum) {
 
 comptime {
     // Not a perfect comparison but can catch mistakes early
-    std.debug.assert(@sizeOf(JsonTransactionRequest) == @sizeOf(web3.TransactionRequest));
-    std.debug.assert(@typeInfo(JsonTransactionRequest).Struct.fields.len == @typeInfo(web3.TransactionRequest).Struct.fields.len);
-    std.debug.assert(@sizeOf(JsonTransaction) == @sizeOf(web3.Transaction));
-    std.debug.assert(@typeInfo(JsonTransaction).Struct.fields.len == @typeInfo(web3.Transaction).Struct.fields.len);
-    std.debug.assert(@sizeOf(JsonLog) == @sizeOf(web3.Log));
-    std.debug.assert(@typeInfo(JsonLog).Struct.fields.len == @typeInfo(web3.Log).Struct.fields.len);
-    std.debug.assert(@sizeOf(JsonLogs) == @sizeOf(web3.Logs));
-    std.debug.assert(@typeInfo(JsonLogs).Struct.fields.len == @typeInfo(web3.Logs).Struct.fields.len);
-    std.debug.assert(@sizeOf(JsonTransactionReceipt) == @sizeOf(web3.TransactionReceipt));
-    std.debug.assert(@typeInfo(JsonTransactionReceipt).Struct.fields.len == @typeInfo(web3.TransactionReceipt).Struct.fields.len);
-    std.debug.assert(@sizeOf(JsonSyncData) == @sizeOf(web3.SyncData));
-    std.debug.assert(@typeInfo(JsonSyncData).Struct.fields.len == @typeInfo(web3.SyncData).Struct.fields.len);
     std.debug.assert(@sizeOf(JsonSyncStatus) == @sizeOf(web3.SyncStatus));
     std.debug.assert(@typeInfo(JsonSyncStatus).Union.fields.len == @typeInfo(web3.SyncStatus).Union.fields.len);
-    std.debug.assert(@sizeOf(JsonBlock(true)) == @sizeOf(web3.Block(true)));
-    std.debug.assert(@typeInfo(JsonBlock(true)).Struct.fields.len == @typeInfo(web3.Block(true)).Struct.fields.len);
-    std.debug.assert(@sizeOf(JsonBlock(false)) == @sizeOf(web3.Block(false)));
-    std.debug.assert(@typeInfo(JsonBlock(false)).Struct.fields.len == @typeInfo(web3.Block(false)).Struct.fields.len);
 }
 
 const json_rpc_header =
@@ -417,7 +278,7 @@ pub const JsonRpcProvider = struct {
 
     /// eth_signTransaction
     pub fn signTransaction(self: *Self, tx: web3.TransactionRequest) ![]const u8 {
-        var json_tx: *const JsonTransactionRequest = @ptrCast(&tx);
+        var json_tx: *const web3.TransactionRequest = @ptrCast(&tx);
         var params = .{json_tx};
         var data: web3.DataHexString = try self.send("eth_signTransaction", params, web3.DataHexString);
         return data.raw;
@@ -425,13 +286,13 @@ pub const JsonRpcProvider = struct {
 
     /// eth_sendTransaction
     pub fn sendTransaction(self: *Self, tx: web3.TransactionRequest) ![]const u8 {
-        var json_tx: *const JsonTransactionRequest = @ptrCast(&tx);
+        var json_tx: *const web3.TransactionRequest = @ptrCast(&tx);
         var params = .{json_tx};
         var data: web3.DataHexString = try self.send("eth_sendTransaction", params, web3.DataHexString);
         return data.raw;
     }
 
-    /// eth_sendRawTransactkon
+    /// eth_sendRawTransaction
     pub fn sendRawTransaction(self: *Self, data: []const u8) ![]const u8 {
         const hex_data = web3.DataHexString{
             .raw = data,
@@ -443,7 +304,7 @@ pub const JsonRpcProvider = struct {
 
     /// eth_call
     pub fn call(self: *Self, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]const u8 {
-        var json_tx: *const JsonTransactionRequest = @ptrCast(&tx);
+        var json_tx: *const web3.TransactionRequest = @ptrCast(&tx);
         var params = .{ json_tx, self.blockTagToString(block_tag) };
         var data: web3.DataHexString = try self.send("eth_call", params, web3.DataHexString);
         return data.raw;
@@ -451,7 +312,7 @@ pub const JsonRpcProvider = struct {
 
     /// eth_estimateGas
     pub fn estimateGas(self: *Self, tx: web3.TransactionRequest) !u256 {
-        var json_tx: *const JsonTransactionRequest = @ptrCast(&tx);
+        var json_tx: *const web3.TransactionRequest = @ptrCast(&tx);
         var params = .{json_tx};
         const hex_data = try self.send("eth_estimateGas", params, web3.IntHexString(u256));
         return hex_data.raw;
@@ -461,58 +322,50 @@ pub const JsonRpcProvider = struct {
     pub fn getBlockByHash(self: *Self, block_hash: web3.Hash, comptime full_transactions: bool) !web3.Block(full_transactions) {
         var full = full_transactions;
         var params = .{ block_hash, full };
-        const result = try self.send("eth_getBlockByHash", params, JsonBlock(full_transactions));
-        return @as(*const web3.Block(full), @ptrCast(&result)).*;
+        return self.send("eth_getBlockByHash", params, web3.Block(full_transactions));
     }
 
     /// eth_getBlockByNumber
     pub fn getBlockByNumber(self: *Self, block_tag: ?web3.BlockTag, comptime full_transactions: bool) !web3.Block(full_transactions) {
         var full = full_transactions;
         var params = .{ self.blockTagToString(block_tag), full };
-        const result = try self.send("eth_getBlockByNumber", params, JsonBlock(full_transactions));
-        return @as(*const web3.Block(full_transactions), @ptrCast(&result)).*;
+        return self.send("eth_getBlockByNumber", params, web3.Block(full_transactions));
     }
 
     /// eth_getTransactionByHash
     pub fn getTransactionByHash(self: *Self, tx_hash: web3.Hash) !web3.Transaction {
         var params = .{tx_hash};
-        const result = try self.send("eth_getTransactionByHash", params, JsonTransaction);
-        return @as(*const web3.Transaction, @ptrCast(&result)).*;
+        return self.send("eth_getTransactionByHash", params, web3.Transaction);
     }
 
     /// eth_getTransactionByBlockHashAndIndex
     pub fn getTransactionByBlockHashAndIndex(self: *Self, block_hash: web3.Hash, index: u32) !web3.Transaction {
         var params = .{ block_hash, web3.IntHexString(u32).wrap(index) };
-        const result = try self.send("eth_getTransactionByBlockHashAndIndex", params, JsonTransaction);
-        return @as(*const web3.Transaction, @ptrCast(&result)).*;
+        return self.send("eth_getTransactionByBlockHashAndIndex", params, web3.Transaction);
     }
 
     /// eth_getTransactionByBlockNumberAndIndex
     pub fn getTransactionByBlockNumberAndIndex(self: *Self, block_tag: ?web3.BlockTag, index: u32) !web3.Transaction {
         var params = .{ self.blockTagToString(block_tag), web3.IntHexString(u32).wrap(index) };
-        const result = try self.send("eth_getTransactionByBlockNumberAndIndex", params, JsonTransaction);
-        return @as(*const web3.Transaction, @ptrCast(&result)).*;
+        return self.send("eth_getTransactionByBlockNumberAndIndex", params, web3.Transaction);
     }
 
     /// eth_getTransactionReceipt
     pub fn getTransactionReceipt(self: *Self, tx_hash: web3.Hash) !web3.TransactionReceipt {
         var params = .{tx_hash};
-        const result = try self.send("eth_getTransactionReceipt", params, JsonTransactionReceipt);
-        return @as(*const web3.TransactionReceipt, @ptrCast(&result)).*;
+        return self.send("eth_getTransactionReceipt", params, web3.TransactionReceipt);
     }
 
     /// eth_getUncleByBlockHashAndIndex
     pub fn getUngleByBlockHashAndIndex(self: *Self, block_hash: web3.Hash, index: u32) !web3.Block(false) {
         var params = .{ block_hash, web3.IntHexString(u32).wrap(index) };
-        const result = try self.send("eth_getUncleByBlockHashAndIndex", params, JsonBlock(false));
-        return @as(*const web3.Block(false), @ptrCast(&result)).*;
+        return self.send("eth_getUncleByBlockHashAndIndex", params, web3.Block(false));
     }
 
     /// eth_getUncleByBlockNumberAndIndex
     pub fn getUngleByBlockNumberAndIndex(self: *Self, block_tag: ?web3.BlockTag, index: u32) !web3.Block(false) {
         var params = .{ self.blockTagToString(block_tag), web3.IntHexString(u32).wrap(index) };
-        const result = try self.send("eth_getUncleByBlockHashAndIndex", params, JsonBlock(false));
-        return @as(*const web3.Block(false), @ptrCast(&result)).*;
+        return self.send("eth_getUncleByBlockHashAndIndex", params, web3.Block(false));
     }
 
     /// eth_getLogs
@@ -524,8 +377,10 @@ pub const JsonRpcProvider = struct {
             .topics = topics,
         }};
 
-        const result = try self.send("eth_getLogs", params, JsonLogs);
-        return @as(*const web3.Logs, @ptrCast(&result)).*;
+        const result = try self.send("eth_getLogs", params, []web3.Log);
+        return web3.Logs{
+            .raw = result,
+        };
     }
 
     /// Makes an RPC call to the server and then attempts to decode the result into the given

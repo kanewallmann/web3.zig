@@ -3,28 +3,6 @@ const std = @import("std");
 const web3 = @import("web3.zig");
 const parser_allocator = @import("parser_allocator.zig");
 
-// Note: This struct must be identical to `AbiInput`
-const JsonAbiInput = struct {
-    name: ?[]const u8,
-    type: *web3.AbiType,
-    indexed: ?bool,
-};
-
-// Note: This struct must be identical to `AbiOutput`
-const JsonAbiOutput = struct {
-    name: ?[]const u8,
-    type: *web3.AbiType,
-};
-
-// Note: This struct must be identical to `AbiEntry`
-const JsonAbiEntry = struct {
-    name: ?[]const u8,
-    type: enum { function, constructor, receive, fallback, event },
-    inputs: ?[]JsonAbiInput,
-    outputs: ?[]JsonAbiOutput,
-    stateMutability: ?enum { pure, view, nonpayable, payable } = null,
-};
-
 /// Represents an input in an ABI entry
 pub const AbiInput = struct {
     name: ?[]const u8,
@@ -59,6 +37,12 @@ pub const AbiEntry = struct {
     inputs: ?[]AbiInput,
     outputs: ?[]AbiOutput,
     state_mutability: ?enum { pure, view, nonpayable, payable },
+
+    pub const json_def = .{
+        .state_mutability = web3.json.JsonDef{
+            .field_name = "stateMutability",
+        },
+    };
 
     // Recursively frees owned memory
     pub fn deinit(self: AbiEntry, allocator: std.mem.Allocator) void {
@@ -200,16 +184,6 @@ pub const AbiEntry = struct {
         }
     }
 };
-
-comptime {
-    // Not a perfect comparison but can catch mistakes early
-    std.debug.assert(@sizeOf(JsonAbiInput) == @sizeOf(AbiInput));
-    std.debug.assert(@typeInfo(JsonAbiInput).Struct.fields.len == @typeInfo(AbiInput).Struct.fields.len);
-    std.debug.assert(@sizeOf(JsonAbiOutput) == @sizeOf(AbiOutput));
-    std.debug.assert(@typeInfo(JsonAbiOutput).Struct.fields.len == @typeInfo(AbiOutput).Struct.fields.len);
-    std.debug.assert(@sizeOf(JsonAbiEntry) == @sizeOf(AbiEntry));
-    std.debug.assert(@typeInfo(JsonAbiEntry).Struct.fields.len == @typeInfo(AbiEntry).Struct.fields.len);
-}
 
 /// Wrapper around an array of ABI entries
 pub const Abi = struct {
@@ -409,8 +383,7 @@ pub fn parseJson(allocator: std.mem.Allocator, abi: []const u8) !Abi {
     var parent_allocator = arena.allocator();
 
     var ptr = abi;
-    const result = try web3.json.JsonReader.parse(parent_allocator, &ptr, []JsonAbiEntry);
-    const entries = @as(*const []AbiEntry, @ptrCast(&result)).*;
+    const entries = try web3.json.JsonReader.parse(parent_allocator, &ptr, []AbiEntry);
 
     arena.freeList();
 

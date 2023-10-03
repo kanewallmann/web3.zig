@@ -95,7 +95,9 @@ pub const JsonWriter = struct {
 
                         if (@typeInfo(field.type) != .Optional or val_ptr.* != null) {
                             try writer.writeByte('"');
-                            total_size += try writer.write(field.name);
+                            const json_def = getJsonDef(T, field.name);
+                            total_size += try writer.write(json_def.field_name);
+
                             _ = try writer.write("\":");
                             total_size += try write(val_ptr, writer);
 
@@ -318,7 +320,9 @@ pub const JsonReader = struct {
 
             var exists = false;
             inline for (TI.Struct.fields, 0..) |field, i| {
-                if (std.mem.eql(u8, field.name, key)) {
+                const json_def = getJsonDef(T, field.name);
+
+                if (std.mem.eql(u8, json_def.field_name, key)) {
                     @field(result, field.name) = try parse(allocator, &_buffer, field.type);
                     field_exists[i] = true;
                     exists = true;
@@ -363,6 +367,7 @@ pub const JsonReader = struct {
                     @field(result, field.name) = default_value;
                 } else {
                     if (FTI != .Optional) {
+                        std.debug.print("Missing {s}\n", .{field.name});
                         return error.MissingRequiredField;
                     } else {
                         @field(result, field.name) = null;
@@ -488,8 +493,7 @@ pub const JsonReader = struct {
 
         _buffer = _buffer[1..];
 
-        result.shrinkAndFree(result.items.len);
-        return result.items;
+        return result.toOwnedSlice();
     }
 
     fn parseArray(allocator: std.mem.Allocator, buffer: *[]const u8, comptime T: type, comptime L: comptime_int) ![L]T {
@@ -838,4 +842,31 @@ test "reading" {
         var result = JsonReader.parse(allocator, &ptr, Struct);
         try std.testing.expectError(error.MissingRequiredField, result);
     }
+}
+
+pub const JsonDef = struct {
+    field_name: []const u8,
+};
+
+fn getJsonDef(comptime T: type, comptime field_name: []const u8) JsonDef {
+    const TI = @typeInfo(T);
+
+    std.debug.assert(TI == .Struct);
+
+    if (@hasDecl(T, "json_def")) {
+        const json_defs = T.json_def;
+        if (@hasField(@TypeOf(json_defs), field_name)) {
+            return @field(T.json_def, field_name);
+        }
+    }
+
+    return JsonDef{
+        .field_name = field_name,
+    };
+}
+
+test "json def" {
+    const web3 = @import("web3.zig");
+    const json_def = getJsonDef(web3.abi.AbiEntry, "state_mutability");
+    std.debug.assert(std.mem.eql(u8, json_def.field_name, "stateMutability"));
 }

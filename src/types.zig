@@ -459,6 +459,18 @@ pub const TransactionRequest = struct {
     value: ?u256 = null,
     data: ?[]const u8 = null,
 
+    pub const json_def = .{
+        .gas_price = json.JsonDef{
+            .field_name = "gasPrice",
+        },
+        .max_priority_fee_per_gas = json.JsonDef{
+            .field_name = "maxPriorityFeePerGas",
+        },
+        .max_fee_per_gas = json.JsonDef{
+            .field_name = "maxFeePerGas",
+        },
+    };
+
     /// Deallocates owned memory
     pub fn deinit(self: TransactionRequest, allocator: std.mem.Allocator) void {
         if (self.data) |data| {
@@ -485,6 +497,27 @@ pub const Transaction = struct {
     r: u256,
     s: u256,
 
+    pub const json_def = .{
+        .block_hash = json.JsonDef{
+            .field_name = "blockHash",
+        },
+        .block_number = json.JsonDef{
+            .field_name = "blockNumber",
+        },
+        .gas_price = json.JsonDef{
+            .field_name = "gasPrice",
+        },
+        .max_priority_fee_per_gas = json.JsonDef{
+            .field_name = "maxPriorityFeePerGas",
+        },
+        .max_fee_per_gas = json.JsonDef{
+            .field_name = "maxFeePerGas",
+        },
+        .transaction_index = json.JsonDef{
+            .field_name = "transactionIndex",
+        },
+    };
+
     /// Deallocates owned memory
     pub fn deinit(self: Transaction, allocator: std.mem.Allocator) void {
         allocator.free(self.input);
@@ -501,12 +534,42 @@ pub const TransactionReceipt = struct {
     to: Address,
     cumulative_gas_used: u256,
     effective_gas_price: u256,
-    gasUsed: u256,
+    gas_used: u256,
     contract_address: ?Address,
     logs: []Log,
     logs_bloom: FixedDataHexString(256),
     type: u8,
     status: u8,
+
+    pub const json_def = .{
+        .transaction_hash = json.JsonDef{
+            .field_name = "transactionHash",
+        },
+        .transaction_index = json.JsonDef{
+            .field_name = "transactionIndex",
+        },
+        .block_hash = json.JsonDef{
+            .field_name = "blockHash",
+        },
+        .block_number = json.JsonDef{
+            .field_name = "blockNumber",
+        },
+        .cumulative_gas_used = json.JsonDef{
+            .field_name = "cumulativeGasUsed",
+        },
+        .effective_gas_price = json.JsonDef{
+            .field_name = "effectiveGasPrice",
+        },
+        .gas_used = json.JsonDef{
+            .field_name = "gasUsed",
+        },
+        .contract_address = json.JsonDef{
+            .field_name = "contractAddress",
+        },
+        .logs_bloom = json.JsonDef{
+            .field_name = "logsBloom",
+        },
+    };
 
     /// Deallocates owned memory
     pub fn deinit(self: *TransactionReceipt, allocator: std.mem.Allocator) void {
@@ -528,6 +591,24 @@ pub const Log = struct {
     address: Address,
     data: DataHexString,
     topics: []Hash,
+
+    pub const json_def = .{
+        .log_index = json.JsonDef{
+            .field_name = "logIndex",
+        },
+        .transaction_index = json.JsonDef{
+            .field_name = "transactionIndex",
+        },
+        .transaction_hash = json.JsonDef{
+            .field_name = "transactionHash",
+        },
+        .block_hash = json.JsonDef{
+            .field_name = "blockHash",
+        },
+        .block_number = json.JsonDef{
+            .field_name = "blockNumber",
+        },
+    };
 
     /// Frees owned memory
     pub inline fn deinit(self: *Log, allocator: std.mem.Allocator) void {
@@ -584,7 +665,52 @@ pub fn Block(comptime full_transactions: bool) type {
             validator_index: u64,
             address: Address,
             amount: u64,
+
+            pub const json_def = .{
+                .validator_index = json.JsonDef{
+                    .field_name = "validatorIndex",
+                },
+            };
         },
+
+        pub const json_def = .{
+            .extra_data = json.JsonDef{
+                .field_name = "extraData",
+            },
+            .gas_limit = json.JsonDef{
+                .field_name = "gasLimit",
+            },
+            .gas_used = json.JsonDef{
+                .field_name = "gasUsed",
+            },
+            .logs_bloom = json.JsonDef{
+                .field_name = "logsBloom",
+            },
+            .mix_hash = json.JsonDef{
+                .field_name = "mixHash",
+            },
+            .parent_hash = json.JsonDef{
+                .field_name = "parentHash",
+            },
+            .receipts_root = json.JsonDef{
+                .field_name = "receiptsRoot",
+            },
+            .sha3_uncles = json.JsonDef{
+                .field_name = "sha3Uncles",
+            },
+            .state_root = json.JsonDef{
+                .field_name = "stateRoot",
+            },
+            .total_difficulty = json.JsonDef{
+                .field_name = "totalDifficulty",
+            },
+            .transactions_root = json.JsonDef{
+                .field_name = "transactionsRoot",
+            },
+            .withdrawals_root = json.JsonDef{
+                .field_name = "withdrawalsRoot",
+            },
+        };
 
         /// Deallocates owned memory
         pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
@@ -606,6 +732,18 @@ pub const SyncData = struct {
     starting_block: ?u64 = null,
     current_block: ?u64 = null,
     highest_block: ?u64 = null,
+
+    pub const json_def = .{
+        .starting_block = json.JsonDef{
+            .field_name = "startingBlock",
+        },
+        .current_block = json.JsonDef{
+            .field_name = "currentBlock",
+        },
+        .highest_block = json.JsonDef{
+            .field_name = "highestBlock",
+        },
+    };
 };
 
 /// Whether an execution client is syncing and if so, information about
