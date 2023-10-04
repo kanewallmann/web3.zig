@@ -367,7 +367,6 @@ pub const JsonReader = struct {
                     @field(result, field.name) = default_value;
                 } else {
                     if (FTI != .Optional) {
-                        std.debug.print("Missing {s}\n", .{field.name});
                         return error.MissingRequiredField;
                     } else {
                         @field(result, field.name) = null;

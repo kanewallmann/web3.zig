@@ -481,515 +481,514 @@
 <span class="line" id="L367">                    <span class="tok-builtin">@field</span>(result, field.name) = default_value;</span>
 <span class="line" id="L368">                } <span class="tok-kw">else</span> {</span>
 <span class="line" id="L369">                    <span class="tok-kw">if</span> (FTI != .Optional) {</span>
-<span class="line" id="L370">                        std.debug.print(<span class="tok-str">&quot;Missing {s}\n&quot;</span>, .{field.name});</span>
-<span class="line" id="L371">                        <span class="tok-kw">return</span> <span class="tok-kw">error</span>.MissingRequiredField;</span>
-<span class="line" id="L372">                    } <span class="tok-kw">else</span> {</span>
-<span class="line" id="L373">                        <span class="tok-builtin">@field</span>(result, field.name) = <span class="tok-null">null</span>;</span>
-<span class="line" id="L374">                    }</span>
-<span class="line" id="L375">                }</span>
-<span class="line" id="L376">            }</span>
-<span class="line" id="L377">        }</span>
-<span class="line" id="L378"></span>
-<span class="line" id="L379">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L380"></span>
-<span class="line" id="L381">        <span class="tok-kw">return</span> result;</span>
-<span class="line" id="L382">    }</span>
-<span class="line" id="L383"></span>
-<span class="line" id="L384">    <span class="tok-kw">fn</span> <span class="tok-fn">parseTuple</span>(allocator: std.mem.Allocator, buffer: *[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>, <span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>) !T {</span>
-<span class="line" id="L385">        <span class="tok-kw">const</span> TI = <span class="tok-builtin">@typeInfo</span>(T);</span>
-<span class="line" id="L386">        std.debug.assert(TI == .Struct <span class="tok-kw">and</span> TI.Struct.is_tuple);</span>
-<span class="line" id="L387"></span>
-<span class="line" id="L388">        <span class="tok-kw">var</span> _buffer = buffer.*;</span>
-<span class="line" id="L389">        <span class="tok-kw">defer</span> {</span>
-<span class="line" id="L390">            buffer.* = _buffer;</span>
-<span class="line" id="L391">        }</span>
-<span class="line" id="L392"></span>
-<span class="line" id="L393">        <span class="tok-kw">if</span> (_buffer.len == <span class="tok-number">0</span>) {</span>
-<span class="line" id="L394">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
-<span class="line" id="L395">        }</span>
-<span class="line" id="L396"></span>
-<span class="line" id="L397">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">'{'</span>) {</span>
-<span class="line" id="L398">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedObject;</span>
-<span class="line" id="L399">        }</span>
-<span class="line" id="L400"></span>
-<span class="line" id="L401">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L402"></span>
-<span class="line" id="L403">        <span class="tok-kw">var</span> result: T = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L404"></span>
-<span class="line" id="L405">        <span class="tok-kw">const</span> field_count = TI.Struct.fields.len;</span>
-<span class="line" id="L406"></span>
-<span class="line" id="L407">        <span class="tok-kw">inline</span> <span class="tok-kw">for</span> (TI.Struct.fields, <span class="tok-number">0</span>..) |field, i| {</span>
-<span class="line" id="L408">            skipWhitespace(&amp;_buffer);</span>
-<span class="line" id="L409"></span>
-<span class="line" id="L410">            <span class="tok-builtin">@field</span>(result, field.name) = <span class="tok-kw">try</span> parse(allocator, &amp;_buffer, field.<span class="tok-type">type</span>);</span>
-<span class="line" id="L411"></span>
-<span class="line" id="L412">            skipWhitespace(&amp;_buffer);</span>
-<span class="line" id="L413"></span>
-<span class="line" id="L414">            <span class="tok-kw">if</span> (_buffer.len == <span class="tok-number">0</span>) {</span>
-<span class="line" id="L415">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
-<span class="line" id="L416">            }</span>
-<span class="line" id="L417"></span>
-<span class="line" id="L418">            <span class="tok-kw">if</span> (i == field_count - <span class="tok-number">1</span>) {</span>
-<span class="line" id="L419">                <span class="tok-kw">break</span>;</span>
-<span class="line" id="L420">            }</span>
-<span class="line" id="L421"></span>
-<span class="line" id="L422">            <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] == <span class="tok-str">'}'</span>) {</span>
-<span class="line" id="L423">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.MissingRequiredField;</span>
-<span class="line" id="L424">            }</span>
-<span class="line" id="L425"></span>
-<span class="line" id="L426">            <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">','</span>) {</span>
-<span class="line" id="L427">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedComma;</span>
-<span class="line" id="L428">            }</span>
-<span class="line" id="L429"></span>
-<span class="line" id="L430">            _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L431">        }</span>
-<span class="line" id="L432"></span>
-<span class="line" id="L433">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">'}'</span>) {</span>
-<span class="line" id="L434">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedObjectClose;</span>
-<span class="line" id="L435">        }</span>
-<span class="line" id="L436"></span>
-<span class="line" id="L437">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L438"></span>
-<span class="line" id="L439">        <span class="tok-kw">return</span> result;</span>
-<span class="line" id="L440">    }</span>
-<span class="line" id="L441"></span>
-<span class="line" id="L442">    <span class="tok-kw">fn</span> <span class="tok-fn">parseSlice</span>(allocator: std.mem.Allocator, buffer: *[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>, <span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>) ![]T {</span>
-<span class="line" id="L443">        <span class="tok-kw">var</span> _buffer = buffer.*;</span>
-<span class="line" id="L444">        <span class="tok-kw">defer</span> {</span>
-<span class="line" id="L445">            buffer.* = _buffer;</span>
-<span class="line" id="L446">        }</span>
-<span class="line" id="L447"></span>
-<span class="line" id="L448">        <span class="tok-kw">if</span> (_buffer.len == <span class="tok-number">0</span>) {</span>
-<span class="line" id="L449">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
-<span class="line" id="L450">        }</span>
-<span class="line" id="L451"></span>
-<span class="line" id="L452">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">'['</span>) {</span>
-<span class="line" id="L453">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedArray;</span>
-<span class="line" id="L454">        }</span>
-<span class="line" id="L455"></span>
-<span class="line" id="L456">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L457"></span>
-<span class="line" id="L458">        skipWhitespace(&amp;_buffer);</span>
-<span class="line" id="L459"></span>
-<span class="line" id="L460">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] == <span class="tok-str">']'</span>) {</span>
-<span class="line" id="L461">            _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L462">            <span class="tok-kw">return</span> allocator.alloc(T, <span class="tok-number">0</span>);</span>
-<span class="line" id="L463">        }</span>
-<span class="line" id="L464"></span>
-<span class="line" id="L465">        <span class="tok-kw">var</span> result = std.ArrayList(T).init(allocator);</span>
-<span class="line" id="L466"></span>
-<span class="line" id="L467">        <span class="tok-kw">while</span> (_buffer.len &gt; <span class="tok-number">0</span>) {</span>
-<span class="line" id="L468">            skipWhitespace(&amp;_buffer);</span>
-<span class="line" id="L469"></span>
-<span class="line" id="L470">            <span class="tok-kw">const</span> val = <span class="tok-kw">try</span> parse(allocator, &amp;_buffer, T);</span>
-<span class="line" id="L471">            <span class="tok-kw">try</span> result.append(val);</span>
-<span class="line" id="L472"></span>
-<span class="line" id="L473">            skipWhitespace(&amp;_buffer);</span>
-<span class="line" id="L474"></span>
-<span class="line" id="L475">            <span class="tok-kw">if</span> (_buffer.len == <span class="tok-number">0</span>) {</span>
-<span class="line" id="L476">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
-<span class="line" id="L477">            }</span>
-<span class="line" id="L478"></span>
-<span class="line" id="L479">            <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] == <span class="tok-str">']'</span>) {</span>
-<span class="line" id="L480">                <span class="tok-kw">break</span>;</span>
-<span class="line" id="L481">            }</span>
-<span class="line" id="L482"></span>
-<span class="line" id="L483">            <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">','</span>) {</span>
-<span class="line" id="L484">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedComma;</span>
-<span class="line" id="L485">            }</span>
-<span class="line" id="L486"></span>
-<span class="line" id="L487">            _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L488">        }</span>
-<span class="line" id="L489"></span>
-<span class="line" id="L490">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">']'</span>) {</span>
-<span class="line" id="L491">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedArrayClose;</span>
-<span class="line" id="L492">        }</span>
-<span class="line" id="L493"></span>
-<span class="line" id="L494">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L495"></span>
-<span class="line" id="L496">        <span class="tok-kw">return</span> result.toOwnedSlice();</span>
-<span class="line" id="L497">    }</span>
-<span class="line" id="L498"></span>
-<span class="line" id="L499">    <span class="tok-kw">fn</span> <span class="tok-fn">parseArray</span>(allocator: std.mem.Allocator, buffer: *[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>, <span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>, <span class="tok-kw">comptime</span> L: <span class="tok-type">comptime_int</span>) ![L]T {</span>
-<span class="line" id="L500">        <span class="tok-kw">var</span> _buffer = buffer.*;</span>
-<span class="line" id="L501">        <span class="tok-kw">defer</span> {</span>
-<span class="line" id="L502">            buffer.* = _buffer;</span>
-<span class="line" id="L503">        }</span>
-<span class="line" id="L504"></span>
-<span class="line" id="L505">        <span class="tok-kw">if</span> (_buffer.len == <span class="tok-number">0</span>) {</span>
-<span class="line" id="L506">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
-<span class="line" id="L507">        }</span>
-<span class="line" id="L508"></span>
-<span class="line" id="L509">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">'['</span>) {</span>
-<span class="line" id="L510">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedArray;</span>
-<span class="line" id="L511">        }</span>
-<span class="line" id="L512"></span>
-<span class="line" id="L513">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L514"></span>
-<span class="line" id="L515">        <span class="tok-kw">var</span> result: [L]T = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L516"></span>
-<span class="line" id="L517">        <span class="tok-kw">for</span> (<span class="tok-number">0</span>..L) |i| {</span>
-<span class="line" id="L518">            skipWhitespace(&amp;_buffer);</span>
-<span class="line" id="L519"></span>
-<span class="line" id="L520">            result[i] = <span class="tok-kw">try</span> parse(allocator, &amp;_buffer, T);</span>
-<span class="line" id="L521"></span>
-<span class="line" id="L522">            skipWhitespace(&amp;_buffer);</span>
-<span class="line" id="L523"></span>
-<span class="line" id="L524">            <span class="tok-kw">if</span> (i == L - <span class="tok-number">1</span>) {</span>
-<span class="line" id="L525">                <span class="tok-kw">break</span>;</span>
-<span class="line" id="L526">            }</span>
-<span class="line" id="L527"></span>
-<span class="line" id="L528">            <span class="tok-kw">if</span> (_buffer.len == <span class="tok-number">0</span>) {</span>
-<span class="line" id="L529">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
-<span class="line" id="L530">            }</span>
-<span class="line" id="L531"></span>
-<span class="line" id="L532">            <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">','</span>) {</span>
-<span class="line" id="L533">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedComma;</span>
-<span class="line" id="L534">            }</span>
-<span class="line" id="L535"></span>
-<span class="line" id="L536">            _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L537">        }</span>
-<span class="line" id="L538"></span>
-<span class="line" id="L539">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">']'</span>) {</span>
-<span class="line" id="L540">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedArrayClose;</span>
-<span class="line" id="L541">        }</span>
-<span class="line" id="L542"></span>
-<span class="line" id="L543">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L544"></span>
-<span class="line" id="L545">        <span class="tok-kw">return</span> result;</span>
-<span class="line" id="L546">    }</span>
-<span class="line" id="L547"></span>
-<span class="line" id="L548">    <span class="tok-kw">fn</span> <span class="tok-fn">parseAnyArray</span>(allocator: std.mem.Allocator, buffer: *[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !<span class="tok-type">void</span> {</span>
-<span class="line" id="L549">        <span class="tok-kw">var</span> _buffer = buffer.*;</span>
-<span class="line" id="L550">        <span class="tok-kw">defer</span> {</span>
-<span class="line" id="L551">            buffer.* = _buffer;</span>
-<span class="line" id="L552">        }</span>
-<span class="line" id="L553"></span>
-<span class="line" id="L554">        <span class="tok-kw">if</span> (_buffer.len == <span class="tok-number">0</span>) {</span>
-<span class="line" id="L555">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
-<span class="line" id="L556">        }</span>
-<span class="line" id="L557"></span>
-<span class="line" id="L558">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">'['</span>) {</span>
-<span class="line" id="L559">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedArray;</span>
-<span class="line" id="L560">        }</span>
-<span class="line" id="L561"></span>
-<span class="line" id="L562">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L563"></span>
-<span class="line" id="L564">        skipWhitespace(&amp;_buffer);</span>
-<span class="line" id="L565"></span>
-<span class="line" id="L566">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] == <span class="tok-str">']'</span>) {</span>
-<span class="line" id="L567">            _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L568">            <span class="tok-kw">return</span>;</span>
-<span class="line" id="L569">        }</span>
-<span class="line" id="L570"></span>
-<span class="line" id="L571">        <span class="tok-kw">while</span> (_buffer.len &gt; <span class="tok-number">0</span>) {</span>
-<span class="line" id="L572">            skipWhitespace(&amp;_buffer);</span>
-<span class="line" id="L573"></span>
-<span class="line" id="L574">            <span class="tok-kw">try</span> parseAny(allocator, &amp;_buffer);</span>
-<span class="line" id="L575"></span>
-<span class="line" id="L576">            skipWhitespace(&amp;_buffer);</span>
-<span class="line" id="L577"></span>
-<span class="line" id="L578">            <span class="tok-kw">if</span> (_buffer.len == <span class="tok-number">0</span>) {</span>
-<span class="line" id="L579">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
-<span class="line" id="L580">            }</span>
-<span class="line" id="L581"></span>
-<span class="line" id="L582">            <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] == <span class="tok-str">']'</span>) {</span>
-<span class="line" id="L583">                <span class="tok-kw">break</span>;</span>
-<span class="line" id="L584">            }</span>
-<span class="line" id="L585"></span>
-<span class="line" id="L586">            <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">','</span>) {</span>
-<span class="line" id="L587">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedComma;</span>
-<span class="line" id="L588">            }</span>
-<span class="line" id="L589"></span>
-<span class="line" id="L590">            _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L591">        }</span>
-<span class="line" id="L592"></span>
-<span class="line" id="L593">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">']'</span>) {</span>
-<span class="line" id="L594">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedArrayClose;</span>
-<span class="line" id="L595">        }</span>
-<span class="line" id="L596"></span>
-<span class="line" id="L597">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L598">    }</span>
-<span class="line" id="L599"></span>
-<span class="line" id="L600">    <span class="tok-comment">/// Skips any type of json value at the cursor (allocator not used)</span></span>
-<span class="line" id="L601">    <span class="tok-kw">fn</span> <span class="tok-fn">parseAny</span>(allocator: std.mem.Allocator, buffer: *[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>) <span class="tok-type">anyerror</span>!<span class="tok-type">void</span> {</span>
-<span class="line" id="L602">        <span class="tok-kw">var</span> _buffer = buffer.*;</span>
-<span class="line" id="L603">        <span class="tok-kw">defer</span> {</span>
-<span class="line" id="L604">            buffer.* = _buffer;</span>
-<span class="line" id="L605">        }</span>
-<span class="line" id="L606"></span>
-<span class="line" id="L607">        <span class="tok-kw">switch</span> (_buffer[<span class="tok-number">0</span>]) {</span>
-<span class="line" id="L608">            <span class="tok-str">'&quot;'</span> =&gt; {</span>
-<span class="line" id="L609">                _ = <span class="tok-kw">try</span> parseString(&amp;_buffer);</span>
-<span class="line" id="L610">            },</span>
-<span class="line" id="L611">            <span class="tok-str">'0'</span>...<span class="tok-str">'9'</span> =&gt; {</span>
-<span class="line" id="L612">                _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L613">                <span class="tok-kw">while</span> (_buffer.len &gt; <span class="tok-number">0</span> <span class="tok-kw">and</span> (_buffer[<span class="tok-number">0</span>] == <span class="tok-str">'.'</span> <span class="tok-kw">or</span> std.ascii.isDigit(_buffer[<span class="tok-number">0</span>]))) {</span>
-<span class="line" id="L614">                    _buffer = _buffer[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L615">                }</span>
-<span class="line" id="L616">            },</span>
-<span class="line" id="L617">            <span class="tok-str">'{'</span> =&gt; {</span>
-<span class="line" id="L618">                _ = <span class="tok-kw">try</span> parseStruct(allocator, &amp;_buffer, <span class="tok-kw">struct</span> {});</span>
-<span class="line" id="L619">            },</span>
-<span class="line" id="L620">            <span class="tok-str">'['</span> =&gt; {</span>
-<span class="line" id="L621">                <span class="tok-kw">try</span> parseAnyArray(allocator, &amp;_buffer);</span>
-<span class="line" id="L622">            },</span>
-<span class="line" id="L623">            <span class="tok-str">'f'</span>, <span class="tok-str">'t'</span> =&gt; {</span>
-<span class="line" id="L624">                <span class="tok-kw">if</span> (buffer.len &gt;= <span class="tok-str">&quot;true&quot;</span>.len <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, buffer.*[<span class="tok-number">0</span>..<span class="tok-str">&quot;true&quot;</span>.len], <span class="tok-str">&quot;true&quot;</span>)) {</span>
-<span class="line" id="L625">                    _buffer = _buffer[<span class="tok-str">&quot;true&quot;</span>.len..];</span>
-<span class="line" id="L626">                } <span class="tok-kw">else</span> <span class="tok-kw">if</span> (buffer.len &gt;= <span class="tok-str">&quot;false&quot;</span>.len <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, buffer.*[<span class="tok-number">0</span>..<span class="tok-str">&quot;false&quot;</span>.len], <span class="tok-str">&quot;false&quot;</span>)) {</span>
-<span class="line" id="L627">                    _buffer = _buffer[<span class="tok-str">&quot;false&quot;</span>.len..];</span>
-<span class="line" id="L628">                } <span class="tok-kw">else</span> {</span>
-<span class="line" id="L629">                    <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedValue;</span>
-<span class="line" id="L630">                }</span>
-<span class="line" id="L631">            },</span>
-<span class="line" id="L632">            <span class="tok-kw">else</span> =&gt; <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedValue,</span>
-<span class="line" id="L633">        }</span>
-<span class="line" id="L634">    }</span>
-<span class="line" id="L635"></span>
-<span class="line" id="L636">    <span class="tok-comment">/// Parses JSON in a supplied buffer into type T</span></span>
-<span class="line" id="L637">    <span class="tok-comment">/// The supplied buffer pointer is moved to the end of the parsed value, make a copy to</span></span>
-<span class="line" id="L638">    <span class="tok-comment">/// avoid losing track of allocation</span></span>
-<span class="line" id="L639">    <span class="tok-comment">/// Caller is responsible for any memory allocated during parsing which may include</span></span>
-<span class="line" id="L640">    <span class="tok-comment">/// deeply nested pointers, an arena allocator can be used to ensure all allocated memory</span></span>
-<span class="line" id="L641">    <span class="tok-comment">/// is freed correctly</span></span>
-<span class="line" id="L642">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">parse</span>(allocator: std.mem.Allocator, buffer: *[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>, <span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>) !T {</span>
-<span class="line" id="L643">        <span class="tok-kw">const</span> TI = <span class="tok-builtin">@typeInfo</span>(T);</span>
-<span class="line" id="L644"></span>
-<span class="line" id="L645">        skipWhitespace(buffer);</span>
-<span class="line" id="L646"></span>
-<span class="line" id="L647">        <span class="tok-kw">if</span> (buffer.len == <span class="tok-number">0</span>) {</span>
-<span class="line" id="L648">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
-<span class="line" id="L649">        }</span>
-<span class="line" id="L650"></span>
-<span class="line" id="L651">        <span class="tok-kw">if</span> (TI == .Struct <span class="tok-kw">or</span> TI == .Union) {</span>
-<span class="line" id="L652">            <span class="tok-kw">if</span> (<span class="tok-builtin">@hasDecl</span>(T, <span class="tok-str">&quot;fromJson&quot;</span>)) {</span>
-<span class="line" id="L653">                <span class="tok-kw">return</span> T.fromJson(allocator, buffer);</span>
-<span class="line" id="L654">            } <span class="tok-kw">else</span> {</span>
-<span class="line" id="L655">                <span class="tok-kw">if</span> (buffer.*[<span class="tok-number">0</span>] == <span class="tok-str">'&quot;'</span>) {</span>
-<span class="line" id="L656">                    <span class="tok-kw">if</span> (<span class="tok-builtin">@hasDecl</span>(T, <span class="tok-str">&quot;fromString&quot;</span>)) {</span>
-<span class="line" id="L657">                        <span class="tok-kw">const</span> str = <span class="tok-kw">try</span> parseString(buffer);</span>
-<span class="line" id="L658">                        <span class="tok-kw">return</span> T.fromString(str);</span>
-<span class="line" id="L659">                    } <span class="tok-kw">else</span> <span class="tok-kw">if</span> (<span class="tok-builtin">@hasDecl</span>(T, <span class="tok-str">&quot;fromStringAlloc&quot;</span>)) {</span>
-<span class="line" id="L660">                        <span class="tok-kw">const</span> str = <span class="tok-kw">try</span> parseString(buffer);</span>
-<span class="line" id="L661">                        <span class="tok-kw">return</span> <span class="tok-kw">try</span> T.fromStringAlloc(allocator, str);</span>
-<span class="line" id="L662">                    }</span>
-<span class="line" id="L663">                }</span>
-<span class="line" id="L664">            }</span>
-<span class="line" id="L665">        }</span>
-<span class="line" id="L666"></span>
-<span class="line" id="L667">        <span class="tok-kw">switch</span> (TI) {</span>
-<span class="line" id="L668">            .Int =&gt; {</span>
-<span class="line" id="L669">                <span class="tok-kw">return</span> parseInt(buffer, T);</span>
-<span class="line" id="L670">            },</span>
-<span class="line" id="L671">            .Bool =&gt; {</span>
-<span class="line" id="L672">                <span class="tok-kw">if</span> (buffer.len &gt;= <span class="tok-str">&quot;true&quot;</span>.len <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, buffer.*[<span class="tok-number">0</span>..<span class="tok-str">&quot;true&quot;</span>.len], <span class="tok-str">&quot;true&quot;</span>)) {</span>
-<span class="line" id="L673">                    buffer.* = buffer.*[<span class="tok-str">&quot;true&quot;</span>.len..];</span>
-<span class="line" id="L674">                    <span class="tok-kw">return</span> <span class="tok-null">true</span>;</span>
-<span class="line" id="L675">                } <span class="tok-kw">else</span> <span class="tok-kw">if</span> (buffer.len &gt;= <span class="tok-str">&quot;false&quot;</span>.len <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, buffer.*[<span class="tok-number">0</span>..<span class="tok-str">&quot;false&quot;</span>.len], <span class="tok-str">&quot;false&quot;</span>)) {</span>
-<span class="line" id="L676">                    buffer.* = buffer.*[<span class="tok-str">&quot;false&quot;</span>.len..];</span>
-<span class="line" id="L677">                    <span class="tok-kw">return</span> <span class="tok-null">false</span>;</span>
-<span class="line" id="L678">                }</span>
-<span class="line" id="L679">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidBoolean;</span>
-<span class="line" id="L680">            },</span>
-<span class="line" id="L681">            .Struct =&gt; |struct_t| {</span>
-<span class="line" id="L682">                <span class="tok-kw">if</span> (!struct_t.is_tuple) {</span>
-<span class="line" id="L683">                    <span class="tok-kw">return</span> <span class="tok-kw">try</span> parseStruct(allocator, buffer, T);</span>
-<span class="line" id="L684">                } <span class="tok-kw">else</span> {</span>
-<span class="line" id="L685">                    <span class="tok-kw">return</span> <span class="tok-kw">try</span> parseTuple(allocator, buffer, T);</span>
-<span class="line" id="L686">                }</span>
-<span class="line" id="L687">            },</span>
-<span class="line" id="L688">            .Pointer =&gt; |ptr| {</span>
-<span class="line" id="L689">                <span class="tok-kw">switch</span> (ptr.size) {</span>
-<span class="line" id="L690">                    .One =&gt; {</span>
-<span class="line" id="L691">                        <span class="tok-kw">if</span> (<span class="tok-builtin">@hasDecl</span>(ptr.child, <span class="tok-str">&quot;fromStringAlloc&quot;</span>)) {</span>
-<span class="line" id="L692">                            <span class="tok-kw">if</span> (buffer.*[<span class="tok-number">0</span>] == <span class="tok-str">'&quot;'</span>) {</span>
-<span class="line" id="L693">                                <span class="tok-kw">const</span> str = <span class="tok-kw">try</span> parseString(buffer);</span>
-<span class="line" id="L694">                                <span class="tok-kw">return</span> <span class="tok-kw">try</span> ptr.child.fromStringAlloc(allocator, str);</span>
-<span class="line" id="L695">                            }</span>
-<span class="line" id="L696">                        } <span class="tok-kw">else</span> {</span>
-<span class="line" id="L697">                            <span class="tok-kw">var</span> val = <span class="tok-kw">try</span> allocator.create(ptr.child);</span>
-<span class="line" id="L698">                            val.* = <span class="tok-kw">try</span> parse(allocator, buffer, ptr.child);</span>
-<span class="line" id="L699">                            <span class="tok-kw">return</span> val;</span>
-<span class="line" id="L700">                        }</span>
-<span class="line" id="L701"></span>
-<span class="line" id="L702">                        <span class="tok-kw">unreachable</span>;</span>
-<span class="line" id="L703">                    },</span>
-<span class="line" id="L704">                    .Many, .C, .Slice =&gt; {</span>
-<span class="line" id="L705">                        <span class="tok-kw">if</span> (ptr.child == <span class="tok-type">u8</span> <span class="tok-kw">and</span> buffer.*[<span class="tok-number">0</span>] == <span class="tok-str">'&quot;'</span>) {</span>
-<span class="line" id="L706">                            <span class="tok-kw">const</span> str = <span class="tok-kw">try</span> parseString(buffer);</span>
-<span class="line" id="L707">                            <span class="tok-kw">const</span> val = <span class="tok-kw">try</span> allocator.alloc(<span class="tok-type">u8</span>, str.len);</span>
-<span class="line" id="L708">                            <span class="tok-builtin">@memcpy</span>(val, str);</span>
-<span class="line" id="L709">                            <span class="tok-kw">return</span> val;</span>
-<span class="line" id="L710">                        }</span>
-<span class="line" id="L711"></span>
-<span class="line" id="L712">                        <span class="tok-kw">return</span> <span class="tok-kw">try</span> parseSlice(allocator, buffer, ptr.child);</span>
-<span class="line" id="L713">                    },</span>
-<span class="line" id="L714">                }</span>
-<span class="line" id="L715">            },</span>
-<span class="line" id="L716">            .Array =&gt; |arr| {</span>
-<span class="line" id="L717">                <span class="tok-kw">return</span> <span class="tok-kw">try</span> parseArray(allocator, buffer, arr.child, arr.len);</span>
-<span class="line" id="L718">            },</span>
-<span class="line" id="L719">            .Optional =&gt; |opt| {</span>
-<span class="line" id="L720">                <span class="tok-kw">if</span> (buffer.len &gt;= <span class="tok-str">&quot;null&quot;</span>.len <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, buffer.*[<span class="tok-number">0</span>..<span class="tok-str">&quot;null&quot;</span>.len], <span class="tok-str">&quot;null&quot;</span>)) {</span>
-<span class="line" id="L721">                    buffer.* = buffer.*[<span class="tok-str">&quot;null&quot;</span>.len..];</span>
-<span class="line" id="L722">                    <span class="tok-kw">return</span> <span class="tok-null">null</span>;</span>
-<span class="line" id="L723">                }</span>
-<span class="line" id="L724">                <span class="tok-kw">return</span> <span class="tok-kw">try</span> parse(allocator, buffer, opt.child);</span>
-<span class="line" id="L725">            },</span>
-<span class="line" id="L726">            .Enum =&gt; |enum_t| {</span>
-<span class="line" id="L727">                <span class="tok-kw">if</span> (buffer.*[<span class="tok-number">0</span>] == <span class="tok-str">'&quot;'</span>) {</span>
-<span class="line" id="L728">                    <span class="tok-kw">const</span> str = <span class="tok-kw">try</span> parseString(buffer);</span>
-<span class="line" id="L729">                    <span class="tok-kw">inline</span> <span class="tok-kw">for</span> (enum_t.fields) |field| {</span>
-<span class="line" id="L730">                        <span class="tok-kw">if</span> (std.mem.eql(<span class="tok-type">u8</span>, field.name, str)) {</span>
-<span class="line" id="L731">                            <span class="tok-kw">return</span> <span class="tok-builtin">@enumFromInt</span>(field.value);</span>
-<span class="line" id="L732">                        }</span>
-<span class="line" id="L733">                    }</span>
-<span class="line" id="L734">                }</span>
-<span class="line" id="L735"></span>
-<span class="line" id="L736">                <span class="tok-kw">unreachable</span>;</span>
-<span class="line" id="L737">            },</span>
-<span class="line" id="L738">            <span class="tok-kw">else</span> =&gt; {</span>
-<span class="line" id="L739">                <span class="tok-builtin">@compileError</span>(<span class="tok-str">&quot;Cannot deserialize type &quot;</span> ++ <span class="tok-builtin">@typeName</span>(T));</span>
-<span class="line" id="L740">            },</span>
-<span class="line" id="L741">        }</span>
-<span class="line" id="L742">    }</span>
-<span class="line" id="L743"></span>
-<span class="line" id="L744">    <span class="tok-kw">fn</span> <span class="tok-fn">skipWhitespace</span>(buffer: *[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>) <span class="tok-type">void</span> {</span>
-<span class="line" id="L745">        <span class="tok-kw">while</span> (buffer.*.len &gt; <span class="tok-number">0</span> <span class="tok-kw">and</span> std.ascii.isWhitespace(buffer.*[<span class="tok-number">0</span>])) {</span>
-<span class="line" id="L746">            buffer.* = buffer.*[<span class="tok-number">1</span>..];</span>
-<span class="line" id="L747">        }</span>
-<span class="line" id="L748">    }</span>
-<span class="line" id="L749">};</span>
-<span class="line" id="L750"></span>
-<span class="line" id="L751"><span class="tok-kw">test</span> <span class="tok-str">&quot;writing&quot;</span> {</span>
-<span class="line" id="L752">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
-<span class="line" id="L753"></span>
-<span class="line" id="L754">    <span class="tok-comment">// Struct</span>
+<span class="line" id="L370">                        <span class="tok-kw">return</span> <span class="tok-kw">error</span>.MissingRequiredField;</span>
+<span class="line" id="L371">                    } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L372">                        <span class="tok-builtin">@field</span>(result, field.name) = <span class="tok-null">null</span>;</span>
+<span class="line" id="L373">                    }</span>
+<span class="line" id="L374">                }</span>
+<span class="line" id="L375">            }</span>
+<span class="line" id="L376">        }</span>
+<span class="line" id="L377"></span>
+<span class="line" id="L378">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L379"></span>
+<span class="line" id="L380">        <span class="tok-kw">return</span> result;</span>
+<span class="line" id="L381">    }</span>
+<span class="line" id="L382"></span>
+<span class="line" id="L383">    <span class="tok-kw">fn</span> <span class="tok-fn">parseTuple</span>(allocator: std.mem.Allocator, buffer: *[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>, <span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>) !T {</span>
+<span class="line" id="L384">        <span class="tok-kw">const</span> TI = <span class="tok-builtin">@typeInfo</span>(T);</span>
+<span class="line" id="L385">        std.debug.assert(TI == .Struct <span class="tok-kw">and</span> TI.Struct.is_tuple);</span>
+<span class="line" id="L386"></span>
+<span class="line" id="L387">        <span class="tok-kw">var</span> _buffer = buffer.*;</span>
+<span class="line" id="L388">        <span class="tok-kw">defer</span> {</span>
+<span class="line" id="L389">            buffer.* = _buffer;</span>
+<span class="line" id="L390">        }</span>
+<span class="line" id="L391"></span>
+<span class="line" id="L392">        <span class="tok-kw">if</span> (_buffer.len == <span class="tok-number">0</span>) {</span>
+<span class="line" id="L393">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
+<span class="line" id="L394">        }</span>
+<span class="line" id="L395"></span>
+<span class="line" id="L396">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">'{'</span>) {</span>
+<span class="line" id="L397">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedObject;</span>
+<span class="line" id="L398">        }</span>
+<span class="line" id="L399"></span>
+<span class="line" id="L400">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L401"></span>
+<span class="line" id="L402">        <span class="tok-kw">var</span> result: T = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L403"></span>
+<span class="line" id="L404">        <span class="tok-kw">const</span> field_count = TI.Struct.fields.len;</span>
+<span class="line" id="L405"></span>
+<span class="line" id="L406">        <span class="tok-kw">inline</span> <span class="tok-kw">for</span> (TI.Struct.fields, <span class="tok-number">0</span>..) |field, i| {</span>
+<span class="line" id="L407">            skipWhitespace(&amp;_buffer);</span>
+<span class="line" id="L408"></span>
+<span class="line" id="L409">            <span class="tok-builtin">@field</span>(result, field.name) = <span class="tok-kw">try</span> parse(allocator, &amp;_buffer, field.<span class="tok-type">type</span>);</span>
+<span class="line" id="L410"></span>
+<span class="line" id="L411">            skipWhitespace(&amp;_buffer);</span>
+<span class="line" id="L412"></span>
+<span class="line" id="L413">            <span class="tok-kw">if</span> (_buffer.len == <span class="tok-number">0</span>) {</span>
+<span class="line" id="L414">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
+<span class="line" id="L415">            }</span>
+<span class="line" id="L416"></span>
+<span class="line" id="L417">            <span class="tok-kw">if</span> (i == field_count - <span class="tok-number">1</span>) {</span>
+<span class="line" id="L418">                <span class="tok-kw">break</span>;</span>
+<span class="line" id="L419">            }</span>
+<span class="line" id="L420"></span>
+<span class="line" id="L421">            <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] == <span class="tok-str">'}'</span>) {</span>
+<span class="line" id="L422">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.MissingRequiredField;</span>
+<span class="line" id="L423">            }</span>
+<span class="line" id="L424"></span>
+<span class="line" id="L425">            <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">','</span>) {</span>
+<span class="line" id="L426">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedComma;</span>
+<span class="line" id="L427">            }</span>
+<span class="line" id="L428"></span>
+<span class="line" id="L429">            _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L430">        }</span>
+<span class="line" id="L431"></span>
+<span class="line" id="L432">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">'}'</span>) {</span>
+<span class="line" id="L433">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedObjectClose;</span>
+<span class="line" id="L434">        }</span>
+<span class="line" id="L435"></span>
+<span class="line" id="L436">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L437"></span>
+<span class="line" id="L438">        <span class="tok-kw">return</span> result;</span>
+<span class="line" id="L439">    }</span>
+<span class="line" id="L440"></span>
+<span class="line" id="L441">    <span class="tok-kw">fn</span> <span class="tok-fn">parseSlice</span>(allocator: std.mem.Allocator, buffer: *[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>, <span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>) ![]T {</span>
+<span class="line" id="L442">        <span class="tok-kw">var</span> _buffer = buffer.*;</span>
+<span class="line" id="L443">        <span class="tok-kw">defer</span> {</span>
+<span class="line" id="L444">            buffer.* = _buffer;</span>
+<span class="line" id="L445">        }</span>
+<span class="line" id="L446"></span>
+<span class="line" id="L447">        <span class="tok-kw">if</span> (_buffer.len == <span class="tok-number">0</span>) {</span>
+<span class="line" id="L448">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
+<span class="line" id="L449">        }</span>
+<span class="line" id="L450"></span>
+<span class="line" id="L451">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">'['</span>) {</span>
+<span class="line" id="L452">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedArray;</span>
+<span class="line" id="L453">        }</span>
+<span class="line" id="L454"></span>
+<span class="line" id="L455">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L456"></span>
+<span class="line" id="L457">        skipWhitespace(&amp;_buffer);</span>
+<span class="line" id="L458"></span>
+<span class="line" id="L459">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] == <span class="tok-str">']'</span>) {</span>
+<span class="line" id="L460">            _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L461">            <span class="tok-kw">return</span> allocator.alloc(T, <span class="tok-number">0</span>);</span>
+<span class="line" id="L462">        }</span>
+<span class="line" id="L463"></span>
+<span class="line" id="L464">        <span class="tok-kw">var</span> result = std.ArrayList(T).init(allocator);</span>
+<span class="line" id="L465"></span>
+<span class="line" id="L466">        <span class="tok-kw">while</span> (_buffer.len &gt; <span class="tok-number">0</span>) {</span>
+<span class="line" id="L467">            skipWhitespace(&amp;_buffer);</span>
+<span class="line" id="L468"></span>
+<span class="line" id="L469">            <span class="tok-kw">const</span> val = <span class="tok-kw">try</span> parse(allocator, &amp;_buffer, T);</span>
+<span class="line" id="L470">            <span class="tok-kw">try</span> result.append(val);</span>
+<span class="line" id="L471"></span>
+<span class="line" id="L472">            skipWhitespace(&amp;_buffer);</span>
+<span class="line" id="L473"></span>
+<span class="line" id="L474">            <span class="tok-kw">if</span> (_buffer.len == <span class="tok-number">0</span>) {</span>
+<span class="line" id="L475">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
+<span class="line" id="L476">            }</span>
+<span class="line" id="L477"></span>
+<span class="line" id="L478">            <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] == <span class="tok-str">']'</span>) {</span>
+<span class="line" id="L479">                <span class="tok-kw">break</span>;</span>
+<span class="line" id="L480">            }</span>
+<span class="line" id="L481"></span>
+<span class="line" id="L482">            <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">','</span>) {</span>
+<span class="line" id="L483">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedComma;</span>
+<span class="line" id="L484">            }</span>
+<span class="line" id="L485"></span>
+<span class="line" id="L486">            _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L487">        }</span>
+<span class="line" id="L488"></span>
+<span class="line" id="L489">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">']'</span>) {</span>
+<span class="line" id="L490">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedArrayClose;</span>
+<span class="line" id="L491">        }</span>
+<span class="line" id="L492"></span>
+<span class="line" id="L493">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L494"></span>
+<span class="line" id="L495">        <span class="tok-kw">return</span> result.toOwnedSlice();</span>
+<span class="line" id="L496">    }</span>
+<span class="line" id="L497"></span>
+<span class="line" id="L498">    <span class="tok-kw">fn</span> <span class="tok-fn">parseArray</span>(allocator: std.mem.Allocator, buffer: *[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>, <span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>, <span class="tok-kw">comptime</span> L: <span class="tok-type">comptime_int</span>) ![L]T {</span>
+<span class="line" id="L499">        <span class="tok-kw">var</span> _buffer = buffer.*;</span>
+<span class="line" id="L500">        <span class="tok-kw">defer</span> {</span>
+<span class="line" id="L501">            buffer.* = _buffer;</span>
+<span class="line" id="L502">        }</span>
+<span class="line" id="L503"></span>
+<span class="line" id="L504">        <span class="tok-kw">if</span> (_buffer.len == <span class="tok-number">0</span>) {</span>
+<span class="line" id="L505">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
+<span class="line" id="L506">        }</span>
+<span class="line" id="L507"></span>
+<span class="line" id="L508">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">'['</span>) {</span>
+<span class="line" id="L509">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedArray;</span>
+<span class="line" id="L510">        }</span>
+<span class="line" id="L511"></span>
+<span class="line" id="L512">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L513"></span>
+<span class="line" id="L514">        <span class="tok-kw">var</span> result: [L]T = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L515"></span>
+<span class="line" id="L516">        <span class="tok-kw">for</span> (<span class="tok-number">0</span>..L) |i| {</span>
+<span class="line" id="L517">            skipWhitespace(&amp;_buffer);</span>
+<span class="line" id="L518"></span>
+<span class="line" id="L519">            result[i] = <span class="tok-kw">try</span> parse(allocator, &amp;_buffer, T);</span>
+<span class="line" id="L520"></span>
+<span class="line" id="L521">            skipWhitespace(&amp;_buffer);</span>
+<span class="line" id="L522"></span>
+<span class="line" id="L523">            <span class="tok-kw">if</span> (i == L - <span class="tok-number">1</span>) {</span>
+<span class="line" id="L524">                <span class="tok-kw">break</span>;</span>
+<span class="line" id="L525">            }</span>
+<span class="line" id="L526"></span>
+<span class="line" id="L527">            <span class="tok-kw">if</span> (_buffer.len == <span class="tok-number">0</span>) {</span>
+<span class="line" id="L528">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
+<span class="line" id="L529">            }</span>
+<span class="line" id="L530"></span>
+<span class="line" id="L531">            <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">','</span>) {</span>
+<span class="line" id="L532">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedComma;</span>
+<span class="line" id="L533">            }</span>
+<span class="line" id="L534"></span>
+<span class="line" id="L535">            _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L536">        }</span>
+<span class="line" id="L537"></span>
+<span class="line" id="L538">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">']'</span>) {</span>
+<span class="line" id="L539">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedArrayClose;</span>
+<span class="line" id="L540">        }</span>
+<span class="line" id="L541"></span>
+<span class="line" id="L542">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L543"></span>
+<span class="line" id="L544">        <span class="tok-kw">return</span> result;</span>
+<span class="line" id="L545">    }</span>
+<span class="line" id="L546"></span>
+<span class="line" id="L547">    <span class="tok-kw">fn</span> <span class="tok-fn">parseAnyArray</span>(allocator: std.mem.Allocator, buffer: *[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L548">        <span class="tok-kw">var</span> _buffer = buffer.*;</span>
+<span class="line" id="L549">        <span class="tok-kw">defer</span> {</span>
+<span class="line" id="L550">            buffer.* = _buffer;</span>
+<span class="line" id="L551">        }</span>
+<span class="line" id="L552"></span>
+<span class="line" id="L553">        <span class="tok-kw">if</span> (_buffer.len == <span class="tok-number">0</span>) {</span>
+<span class="line" id="L554">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
+<span class="line" id="L555">        }</span>
+<span class="line" id="L556"></span>
+<span class="line" id="L557">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">'['</span>) {</span>
+<span class="line" id="L558">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedArray;</span>
+<span class="line" id="L559">        }</span>
+<span class="line" id="L560"></span>
+<span class="line" id="L561">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L562"></span>
+<span class="line" id="L563">        skipWhitespace(&amp;_buffer);</span>
+<span class="line" id="L564"></span>
+<span class="line" id="L565">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] == <span class="tok-str">']'</span>) {</span>
+<span class="line" id="L566">            _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L567">            <span class="tok-kw">return</span>;</span>
+<span class="line" id="L568">        }</span>
+<span class="line" id="L569"></span>
+<span class="line" id="L570">        <span class="tok-kw">while</span> (_buffer.len &gt; <span class="tok-number">0</span>) {</span>
+<span class="line" id="L571">            skipWhitespace(&amp;_buffer);</span>
+<span class="line" id="L572"></span>
+<span class="line" id="L573">            <span class="tok-kw">try</span> parseAny(allocator, &amp;_buffer);</span>
+<span class="line" id="L574"></span>
+<span class="line" id="L575">            skipWhitespace(&amp;_buffer);</span>
+<span class="line" id="L576"></span>
+<span class="line" id="L577">            <span class="tok-kw">if</span> (_buffer.len == <span class="tok-number">0</span>) {</span>
+<span class="line" id="L578">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
+<span class="line" id="L579">            }</span>
+<span class="line" id="L580"></span>
+<span class="line" id="L581">            <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] == <span class="tok-str">']'</span>) {</span>
+<span class="line" id="L582">                <span class="tok-kw">break</span>;</span>
+<span class="line" id="L583">            }</span>
+<span class="line" id="L584"></span>
+<span class="line" id="L585">            <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">','</span>) {</span>
+<span class="line" id="L586">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedComma;</span>
+<span class="line" id="L587">            }</span>
+<span class="line" id="L588"></span>
+<span class="line" id="L589">            _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L590">        }</span>
+<span class="line" id="L591"></span>
+<span class="line" id="L592">        <span class="tok-kw">if</span> (_buffer[<span class="tok-number">0</span>] != <span class="tok-str">']'</span>) {</span>
+<span class="line" id="L593">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedArrayClose;</span>
+<span class="line" id="L594">        }</span>
+<span class="line" id="L595"></span>
+<span class="line" id="L596">        _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L597">    }</span>
+<span class="line" id="L598"></span>
+<span class="line" id="L599">    <span class="tok-comment">/// Skips any type of json value at the cursor (allocator not used)</span></span>
+<span class="line" id="L600">    <span class="tok-kw">fn</span> <span class="tok-fn">parseAny</span>(allocator: std.mem.Allocator, buffer: *[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>) <span class="tok-type">anyerror</span>!<span class="tok-type">void</span> {</span>
+<span class="line" id="L601">        <span class="tok-kw">var</span> _buffer = buffer.*;</span>
+<span class="line" id="L602">        <span class="tok-kw">defer</span> {</span>
+<span class="line" id="L603">            buffer.* = _buffer;</span>
+<span class="line" id="L604">        }</span>
+<span class="line" id="L605"></span>
+<span class="line" id="L606">        <span class="tok-kw">switch</span> (_buffer[<span class="tok-number">0</span>]) {</span>
+<span class="line" id="L607">            <span class="tok-str">'&quot;'</span> =&gt; {</span>
+<span class="line" id="L608">                _ = <span class="tok-kw">try</span> parseString(&amp;_buffer);</span>
+<span class="line" id="L609">            },</span>
+<span class="line" id="L610">            <span class="tok-str">'0'</span>...<span class="tok-str">'9'</span> =&gt; {</span>
+<span class="line" id="L611">                _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L612">                <span class="tok-kw">while</span> (_buffer.len &gt; <span class="tok-number">0</span> <span class="tok-kw">and</span> (_buffer[<span class="tok-number">0</span>] == <span class="tok-str">'.'</span> <span class="tok-kw">or</span> std.ascii.isDigit(_buffer[<span class="tok-number">0</span>]))) {</span>
+<span class="line" id="L613">                    _buffer = _buffer[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L614">                }</span>
+<span class="line" id="L615">            },</span>
+<span class="line" id="L616">            <span class="tok-str">'{'</span> =&gt; {</span>
+<span class="line" id="L617">                _ = <span class="tok-kw">try</span> parseStruct(allocator, &amp;_buffer, <span class="tok-kw">struct</span> {});</span>
+<span class="line" id="L618">            },</span>
+<span class="line" id="L619">            <span class="tok-str">'['</span> =&gt; {</span>
+<span class="line" id="L620">                <span class="tok-kw">try</span> parseAnyArray(allocator, &amp;_buffer);</span>
+<span class="line" id="L621">            },</span>
+<span class="line" id="L622">            <span class="tok-str">'f'</span>, <span class="tok-str">'t'</span> =&gt; {</span>
+<span class="line" id="L623">                <span class="tok-kw">if</span> (buffer.len &gt;= <span class="tok-str">&quot;true&quot;</span>.len <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, buffer.*[<span class="tok-number">0</span>..<span class="tok-str">&quot;true&quot;</span>.len], <span class="tok-str">&quot;true&quot;</span>)) {</span>
+<span class="line" id="L624">                    _buffer = _buffer[<span class="tok-str">&quot;true&quot;</span>.len..];</span>
+<span class="line" id="L625">                } <span class="tok-kw">else</span> <span class="tok-kw">if</span> (buffer.len &gt;= <span class="tok-str">&quot;false&quot;</span>.len <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, buffer.*[<span class="tok-number">0</span>..<span class="tok-str">&quot;false&quot;</span>.len], <span class="tok-str">&quot;false&quot;</span>)) {</span>
+<span class="line" id="L626">                    _buffer = _buffer[<span class="tok-str">&quot;false&quot;</span>.len..];</span>
+<span class="line" id="L627">                } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L628">                    <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedValue;</span>
+<span class="line" id="L629">                }</span>
+<span class="line" id="L630">            },</span>
+<span class="line" id="L631">            <span class="tok-kw">else</span> =&gt; <span class="tok-kw">return</span> <span class="tok-kw">error</span>.ExpectedValue,</span>
+<span class="line" id="L632">        }</span>
+<span class="line" id="L633">    }</span>
+<span class="line" id="L634"></span>
+<span class="line" id="L635">    <span class="tok-comment">/// Parses JSON in a supplied buffer into type T</span></span>
+<span class="line" id="L636">    <span class="tok-comment">/// The supplied buffer pointer is moved to the end of the parsed value, make a copy to</span></span>
+<span class="line" id="L637">    <span class="tok-comment">/// avoid losing track of allocation</span></span>
+<span class="line" id="L638">    <span class="tok-comment">/// Caller is responsible for any memory allocated during parsing which may include</span></span>
+<span class="line" id="L639">    <span class="tok-comment">/// deeply nested pointers, an arena allocator can be used to ensure all allocated memory</span></span>
+<span class="line" id="L640">    <span class="tok-comment">/// is freed correctly</span></span>
+<span class="line" id="L641">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">parse</span>(allocator: std.mem.Allocator, buffer: *[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>, <span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>) !T {</span>
+<span class="line" id="L642">        <span class="tok-kw">const</span> TI = <span class="tok-builtin">@typeInfo</span>(T);</span>
+<span class="line" id="L643"></span>
+<span class="line" id="L644">        skipWhitespace(buffer);</span>
+<span class="line" id="L645"></span>
+<span class="line" id="L646">        <span class="tok-kw">if</span> (buffer.len == <span class="tok-number">0</span>) {</span>
+<span class="line" id="L647">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.EndOfBuffer;</span>
+<span class="line" id="L648">        }</span>
+<span class="line" id="L649"></span>
+<span class="line" id="L650">        <span class="tok-kw">if</span> (TI == .Struct <span class="tok-kw">or</span> TI == .Union) {</span>
+<span class="line" id="L651">            <span class="tok-kw">if</span> (<span class="tok-builtin">@hasDecl</span>(T, <span class="tok-str">&quot;fromJson&quot;</span>)) {</span>
+<span class="line" id="L652">                <span class="tok-kw">return</span> T.fromJson(allocator, buffer);</span>
+<span class="line" id="L653">            } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L654">                <span class="tok-kw">if</span> (buffer.*[<span class="tok-number">0</span>] == <span class="tok-str">'&quot;'</span>) {</span>
+<span class="line" id="L655">                    <span class="tok-kw">if</span> (<span class="tok-builtin">@hasDecl</span>(T, <span class="tok-str">&quot;fromString&quot;</span>)) {</span>
+<span class="line" id="L656">                        <span class="tok-kw">const</span> str = <span class="tok-kw">try</span> parseString(buffer);</span>
+<span class="line" id="L657">                        <span class="tok-kw">return</span> T.fromString(str);</span>
+<span class="line" id="L658">                    } <span class="tok-kw">else</span> <span class="tok-kw">if</span> (<span class="tok-builtin">@hasDecl</span>(T, <span class="tok-str">&quot;fromStringAlloc&quot;</span>)) {</span>
+<span class="line" id="L659">                        <span class="tok-kw">const</span> str = <span class="tok-kw">try</span> parseString(buffer);</span>
+<span class="line" id="L660">                        <span class="tok-kw">return</span> <span class="tok-kw">try</span> T.fromStringAlloc(allocator, str);</span>
+<span class="line" id="L661">                    }</span>
+<span class="line" id="L662">                }</span>
+<span class="line" id="L663">            }</span>
+<span class="line" id="L664">        }</span>
+<span class="line" id="L665"></span>
+<span class="line" id="L666">        <span class="tok-kw">switch</span> (TI) {</span>
+<span class="line" id="L667">            .Int =&gt; {</span>
+<span class="line" id="L668">                <span class="tok-kw">return</span> parseInt(buffer, T);</span>
+<span class="line" id="L669">            },</span>
+<span class="line" id="L670">            .Bool =&gt; {</span>
+<span class="line" id="L671">                <span class="tok-kw">if</span> (buffer.len &gt;= <span class="tok-str">&quot;true&quot;</span>.len <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, buffer.*[<span class="tok-number">0</span>..<span class="tok-str">&quot;true&quot;</span>.len], <span class="tok-str">&quot;true&quot;</span>)) {</span>
+<span class="line" id="L672">                    buffer.* = buffer.*[<span class="tok-str">&quot;true&quot;</span>.len..];</span>
+<span class="line" id="L673">                    <span class="tok-kw">return</span> <span class="tok-null">true</span>;</span>
+<span class="line" id="L674">                } <span class="tok-kw">else</span> <span class="tok-kw">if</span> (buffer.len &gt;= <span class="tok-str">&quot;false&quot;</span>.len <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, buffer.*[<span class="tok-number">0</span>..<span class="tok-str">&quot;false&quot;</span>.len], <span class="tok-str">&quot;false&quot;</span>)) {</span>
+<span class="line" id="L675">                    buffer.* = buffer.*[<span class="tok-str">&quot;false&quot;</span>.len..];</span>
+<span class="line" id="L676">                    <span class="tok-kw">return</span> <span class="tok-null">false</span>;</span>
+<span class="line" id="L677">                }</span>
+<span class="line" id="L678">                <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidBoolean;</span>
+<span class="line" id="L679">            },</span>
+<span class="line" id="L680">            .Struct =&gt; |struct_t| {</span>
+<span class="line" id="L681">                <span class="tok-kw">if</span> (!struct_t.is_tuple) {</span>
+<span class="line" id="L682">                    <span class="tok-kw">return</span> <span class="tok-kw">try</span> parseStruct(allocator, buffer, T);</span>
+<span class="line" id="L683">                } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L684">                    <span class="tok-kw">return</span> <span class="tok-kw">try</span> parseTuple(allocator, buffer, T);</span>
+<span class="line" id="L685">                }</span>
+<span class="line" id="L686">            },</span>
+<span class="line" id="L687">            .Pointer =&gt; |ptr| {</span>
+<span class="line" id="L688">                <span class="tok-kw">switch</span> (ptr.size) {</span>
+<span class="line" id="L689">                    .One =&gt; {</span>
+<span class="line" id="L690">                        <span class="tok-kw">if</span> (<span class="tok-builtin">@hasDecl</span>(ptr.child, <span class="tok-str">&quot;fromStringAlloc&quot;</span>)) {</span>
+<span class="line" id="L691">                            <span class="tok-kw">if</span> (buffer.*[<span class="tok-number">0</span>] == <span class="tok-str">'&quot;'</span>) {</span>
+<span class="line" id="L692">                                <span class="tok-kw">const</span> str = <span class="tok-kw">try</span> parseString(buffer);</span>
+<span class="line" id="L693">                                <span class="tok-kw">return</span> <span class="tok-kw">try</span> ptr.child.fromStringAlloc(allocator, str);</span>
+<span class="line" id="L694">                            }</span>
+<span class="line" id="L695">                        } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L696">                            <span class="tok-kw">var</span> val = <span class="tok-kw">try</span> allocator.create(ptr.child);</span>
+<span class="line" id="L697">                            val.* = <span class="tok-kw">try</span> parse(allocator, buffer, ptr.child);</span>
+<span class="line" id="L698">                            <span class="tok-kw">return</span> val;</span>
+<span class="line" id="L699">                        }</span>
+<span class="line" id="L700"></span>
+<span class="line" id="L701">                        <span class="tok-kw">unreachable</span>;</span>
+<span class="line" id="L702">                    },</span>
+<span class="line" id="L703">                    .Many, .C, .Slice =&gt; {</span>
+<span class="line" id="L704">                        <span class="tok-kw">if</span> (ptr.child == <span class="tok-type">u8</span> <span class="tok-kw">and</span> buffer.*[<span class="tok-number">0</span>] == <span class="tok-str">'&quot;'</span>) {</span>
+<span class="line" id="L705">                            <span class="tok-kw">const</span> str = <span class="tok-kw">try</span> parseString(buffer);</span>
+<span class="line" id="L706">                            <span class="tok-kw">const</span> val = <span class="tok-kw">try</span> allocator.alloc(<span class="tok-type">u8</span>, str.len);</span>
+<span class="line" id="L707">                            <span class="tok-builtin">@memcpy</span>(val, str);</span>
+<span class="line" id="L708">                            <span class="tok-kw">return</span> val;</span>
+<span class="line" id="L709">                        }</span>
+<span class="line" id="L710"></span>
+<span class="line" id="L711">                        <span class="tok-kw">return</span> <span class="tok-kw">try</span> parseSlice(allocator, buffer, ptr.child);</span>
+<span class="line" id="L712">                    },</span>
+<span class="line" id="L713">                }</span>
+<span class="line" id="L714">            },</span>
+<span class="line" id="L715">            .Array =&gt; |arr| {</span>
+<span class="line" id="L716">                <span class="tok-kw">return</span> <span class="tok-kw">try</span> parseArray(allocator, buffer, arr.child, arr.len);</span>
+<span class="line" id="L717">            },</span>
+<span class="line" id="L718">            .Optional =&gt; |opt| {</span>
+<span class="line" id="L719">                <span class="tok-kw">if</span> (buffer.len &gt;= <span class="tok-str">&quot;null&quot;</span>.len <span class="tok-kw">and</span> std.mem.eql(<span class="tok-type">u8</span>, buffer.*[<span class="tok-number">0</span>..<span class="tok-str">&quot;null&quot;</span>.len], <span class="tok-str">&quot;null&quot;</span>)) {</span>
+<span class="line" id="L720">                    buffer.* = buffer.*[<span class="tok-str">&quot;null&quot;</span>.len..];</span>
+<span class="line" id="L721">                    <span class="tok-kw">return</span> <span class="tok-null">null</span>;</span>
+<span class="line" id="L722">                }</span>
+<span class="line" id="L723">                <span class="tok-kw">return</span> <span class="tok-kw">try</span> parse(allocator, buffer, opt.child);</span>
+<span class="line" id="L724">            },</span>
+<span class="line" id="L725">            .Enum =&gt; |enum_t| {</span>
+<span class="line" id="L726">                <span class="tok-kw">if</span> (buffer.*[<span class="tok-number">0</span>] == <span class="tok-str">'&quot;'</span>) {</span>
+<span class="line" id="L727">                    <span class="tok-kw">const</span> str = <span class="tok-kw">try</span> parseString(buffer);</span>
+<span class="line" id="L728">                    <span class="tok-kw">inline</span> <span class="tok-kw">for</span> (enum_t.fields) |field| {</span>
+<span class="line" id="L729">                        <span class="tok-kw">if</span> (std.mem.eql(<span class="tok-type">u8</span>, field.name, str)) {</span>
+<span class="line" id="L730">                            <span class="tok-kw">return</span> <span class="tok-builtin">@enumFromInt</span>(field.value);</span>
+<span class="line" id="L731">                        }</span>
+<span class="line" id="L732">                    }</span>
+<span class="line" id="L733">                }</span>
+<span class="line" id="L734"></span>
+<span class="line" id="L735">                <span class="tok-kw">unreachable</span>;</span>
+<span class="line" id="L736">            },</span>
+<span class="line" id="L737">            <span class="tok-kw">else</span> =&gt; {</span>
+<span class="line" id="L738">                <span class="tok-builtin">@compileError</span>(<span class="tok-str">&quot;Cannot deserialize type &quot;</span> ++ <span class="tok-builtin">@typeName</span>(T));</span>
+<span class="line" id="L739">            },</span>
+<span class="line" id="L740">        }</span>
+<span class="line" id="L741">    }</span>
+<span class="line" id="L742"></span>
+<span class="line" id="L743">    <span class="tok-kw">fn</span> <span class="tok-fn">skipWhitespace</span>(buffer: *[]<span class="tok-kw">const</span> <span class="tok-type">u8</span>) <span class="tok-type">void</span> {</span>
+<span class="line" id="L744">        <span class="tok-kw">while</span> (buffer.*.len &gt; <span class="tok-number">0</span> <span class="tok-kw">and</span> std.ascii.isWhitespace(buffer.*[<span class="tok-number">0</span>])) {</span>
+<span class="line" id="L745">            buffer.* = buffer.*[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L746">        }</span>
+<span class="line" id="L747">    }</span>
+<span class="line" id="L748">};</span>
+<span class="line" id="L749"></span>
+<span class="line" id="L750"><span class="tok-kw">test</span> <span class="tok-str">&quot;writing&quot;</span> {</span>
+<span class="line" id="L751">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
+<span class="line" id="L752"></span>
+<span class="line" id="L753">    <span class="tok-comment">// Struct</span>
 </span>
-<span class="line" id="L755">    {</span>
-<span class="line" id="L756">        <span class="tok-kw">const</span> val: <span class="tok-kw">struct</span> {</span>
-<span class="line" id="L757">            hello: <span class="tok-type">u32</span>,</span>
-<span class="line" id="L758">            world: <span class="tok-type">u32</span>,</span>
-<span class="line" id="L759">        } = .{</span>
-<span class="line" id="L760">            .hello = <span class="tok-number">0x20</span>,</span>
-<span class="line" id="L761">            .world = <span class="tok-number">0x40</span>,</span>
-<span class="line" id="L762">        };</span>
-<span class="line" id="L763"></span>
-<span class="line" id="L764">        <span class="tok-kw">var</span> buf: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L765">        <span class="tok-kw">var</span> fbs = std.io.fixedBufferStream(&amp;buf);</span>
-<span class="line" id="L766"></span>
-<span class="line" id="L767">        <span class="tok-kw">const</span> size = <span class="tok-kw">try</span> JsonWriter.write(val, fbs.writer());</span>
-<span class="line" id="L768"></span>
-<span class="line" id="L769">        assert(std.mem.eql(<span class="tok-type">u8</span>, buf[<span class="tok-number">0</span>..size], <span class="tok-str">&quot;{\&quot;hello\&quot;:\&quot;0x20\&quot;,\&quot;world\&quot;:\&quot;0x40\&quot;}&quot;</span>));</span>
-<span class="line" id="L770">    }</span>
-<span class="line" id="L771">}</span>
-<span class="line" id="L772"></span>
-<span class="line" id="L773"><span class="tok-kw">test</span> <span class="tok-str">&quot;reading&quot;</span> {</span>
-<span class="line" id="L774">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
-<span class="line" id="L775">    <span class="tok-kw">const</span> allocator = std.testing.allocator;</span>
-<span class="line" id="L776"></span>
-<span class="line" id="L777">    <span class="tok-comment">// Struct</span>
+<span class="line" id="L754">    {</span>
+<span class="line" id="L755">        <span class="tok-kw">const</span> val: <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L756">            hello: <span class="tok-type">u32</span>,</span>
+<span class="line" id="L757">            world: <span class="tok-type">u32</span>,</span>
+<span class="line" id="L758">        } = .{</span>
+<span class="line" id="L759">            .hello = <span class="tok-number">0x20</span>,</span>
+<span class="line" id="L760">            .world = <span class="tok-number">0x40</span>,</span>
+<span class="line" id="L761">        };</span>
+<span class="line" id="L762"></span>
+<span class="line" id="L763">        <span class="tok-kw">var</span> buf: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L764">        <span class="tok-kw">var</span> fbs = std.io.fixedBufferStream(&amp;buf);</span>
+<span class="line" id="L765"></span>
+<span class="line" id="L766">        <span class="tok-kw">const</span> size = <span class="tok-kw">try</span> JsonWriter.write(val, fbs.writer());</span>
+<span class="line" id="L767"></span>
+<span class="line" id="L768">        assert(std.mem.eql(<span class="tok-type">u8</span>, buf[<span class="tok-number">0</span>..size], <span class="tok-str">&quot;{\&quot;hello\&quot;:\&quot;0x20\&quot;,\&quot;world\&quot;:\&quot;0x40\&quot;}&quot;</span>));</span>
+<span class="line" id="L769">    }</span>
+<span class="line" id="L770">}</span>
+<span class="line" id="L771"></span>
+<span class="line" id="L772"><span class="tok-kw">test</span> <span class="tok-str">&quot;reading&quot;</span> {</span>
+<span class="line" id="L773">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
+<span class="line" id="L774">    <span class="tok-kw">const</span> allocator = std.testing.allocator;</span>
+<span class="line" id="L775"></span>
+<span class="line" id="L776">    <span class="tok-comment">// Struct</span>
 </span>
-<span class="line" id="L778">    {</span>
-<span class="line" id="L779">        <span class="tok-kw">const</span> Struct = <span class="tok-kw">struct</span> {</span>
-<span class="line" id="L780">            hello: <span class="tok-type">u32</span>,</span>
-<span class="line" id="L781">            world: <span class="tok-type">u32</span>,</span>
-<span class="line" id="L782">        };</span>
-<span class="line" id="L783"></span>
-<span class="line" id="L784">        <span class="tok-kw">const</span> buf = <span class="tok-str">&quot;{\&quot;hello\&quot;:\&quot;0x20\&quot;,\&quot;world\&quot;:\&quot;0x40\&quot;}&quot;</span>;</span>
-<span class="line" id="L785"></span>
-<span class="line" id="L786">        <span class="tok-kw">var</span> ptr: []<span class="tok-kw">const</span> <span class="tok-type">u8</span> = buf[<span class="tok-number">0</span>..];</span>
-<span class="line" id="L787">        <span class="tok-kw">var</span> result = <span class="tok-kw">try</span> JsonReader.parse(allocator, &amp;ptr, Struct);</span>
-<span class="line" id="L788"></span>
-<span class="line" id="L789">        assert(result.hello == <span class="tok-number">0x20</span>);</span>
-<span class="line" id="L790">        assert(result.world == <span class="tok-number">0x40</span>);</span>
-<span class="line" id="L791">    }</span>
-<span class="line" id="L792"></span>
-<span class="line" id="L793">    <span class="tok-comment">// Struct w/ optional</span>
+<span class="line" id="L777">    {</span>
+<span class="line" id="L778">        <span class="tok-kw">const</span> Struct = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L779">            hello: <span class="tok-type">u32</span>,</span>
+<span class="line" id="L780">            world: <span class="tok-type">u32</span>,</span>
+<span class="line" id="L781">        };</span>
+<span class="line" id="L782"></span>
+<span class="line" id="L783">        <span class="tok-kw">const</span> buf = <span class="tok-str">&quot;{\&quot;hello\&quot;:\&quot;0x20\&quot;,\&quot;world\&quot;:\&quot;0x40\&quot;}&quot;</span>;</span>
+<span class="line" id="L784"></span>
+<span class="line" id="L785">        <span class="tok-kw">var</span> ptr: []<span class="tok-kw">const</span> <span class="tok-type">u8</span> = buf[<span class="tok-number">0</span>..];</span>
+<span class="line" id="L786">        <span class="tok-kw">var</span> result = <span class="tok-kw">try</span> JsonReader.parse(allocator, &amp;ptr, Struct);</span>
+<span class="line" id="L787"></span>
+<span class="line" id="L788">        assert(result.hello == <span class="tok-number">0x20</span>);</span>
+<span class="line" id="L789">        assert(result.world == <span class="tok-number">0x40</span>);</span>
+<span class="line" id="L790">    }</span>
+<span class="line" id="L791"></span>
+<span class="line" id="L792">    <span class="tok-comment">// Struct w/ optional</span>
 </span>
-<span class="line" id="L794">    {</span>
-<span class="line" id="L795">        <span class="tok-kw">const</span> Struct = <span class="tok-kw">struct</span> {</span>
-<span class="line" id="L796">            hello: <span class="tok-type">u32</span>,</span>
-<span class="line" id="L797">            world: ?<span class="tok-type">u32</span> = <span class="tok-number">0x60</span>,</span>
-<span class="line" id="L798">        };</span>
-<span class="line" id="L799"></span>
-<span class="line" id="L800">        <span class="tok-kw">const</span> buf = <span class="tok-str">&quot;{\&quot;hello\&quot;:\&quot;0x20\&quot;}&quot;</span>;</span>
-<span class="line" id="L801"></span>
-<span class="line" id="L802">        <span class="tok-kw">var</span> ptr: []<span class="tok-kw">const</span> <span class="tok-type">u8</span> = buf[<span class="tok-number">0</span>..];</span>
-<span class="line" id="L803">        <span class="tok-kw">var</span> result = <span class="tok-kw">try</span> JsonReader.parse(allocator, &amp;ptr, Struct);</span>
-<span class="line" id="L804"></span>
-<span class="line" id="L805">        assert(result.hello == <span class="tok-number">0x20</span>);</span>
-<span class="line" id="L806">        assert(result.world == <span class="tok-number">0x60</span>);</span>
-<span class="line" id="L807">    }</span>
-<span class="line" id="L808"></span>
-<span class="line" id="L809">    <span class="tok-comment">// Invalid number</span>
+<span class="line" id="L793">    {</span>
+<span class="line" id="L794">        <span class="tok-kw">const</span> Struct = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L795">            hello: <span class="tok-type">u32</span>,</span>
+<span class="line" id="L796">            world: ?<span class="tok-type">u32</span> = <span class="tok-number">0x60</span>,</span>
+<span class="line" id="L797">        };</span>
+<span class="line" id="L798"></span>
+<span class="line" id="L799">        <span class="tok-kw">const</span> buf = <span class="tok-str">&quot;{\&quot;hello\&quot;:\&quot;0x20\&quot;}&quot;</span>;</span>
+<span class="line" id="L800"></span>
+<span class="line" id="L801">        <span class="tok-kw">var</span> ptr: []<span class="tok-kw">const</span> <span class="tok-type">u8</span> = buf[<span class="tok-number">0</span>..];</span>
+<span class="line" id="L802">        <span class="tok-kw">var</span> result = <span class="tok-kw">try</span> JsonReader.parse(allocator, &amp;ptr, Struct);</span>
+<span class="line" id="L803"></span>
+<span class="line" id="L804">        assert(result.hello == <span class="tok-number">0x20</span>);</span>
+<span class="line" id="L805">        assert(result.world == <span class="tok-number">0x60</span>);</span>
+<span class="line" id="L806">    }</span>
+<span class="line" id="L807"></span>
+<span class="line" id="L808">    <span class="tok-comment">// Invalid number</span>
 </span>
-<span class="line" id="L810">    {</span>
-<span class="line" id="L811">        <span class="tok-kw">const</span> buf = <span class="tok-str">&quot;{&quot;</span>;</span>
-<span class="line" id="L812"></span>
-<span class="line" id="L813">        <span class="tok-kw">var</span> ptr: []<span class="tok-kw">const</span> <span class="tok-type">u8</span> = buf[<span class="tok-number">0</span>..];</span>
-<span class="line" id="L814">        <span class="tok-kw">var</span> result = JsonReader.parse(allocator, &amp;ptr, <span class="tok-type">u32</span>);</span>
-<span class="line" id="L815">        <span class="tok-kw">try</span> std.testing.expectError(<span class="tok-kw">error</span>.UnexpectedCharacter, result);</span>
-<span class="line" id="L816">    }</span>
-<span class="line" id="L817"></span>
-<span class="line" id="L818">    <span class="tok-comment">// Unexpected EOF</span>
+<span class="line" id="L809">    {</span>
+<span class="line" id="L810">        <span class="tok-kw">const</span> buf = <span class="tok-str">&quot;{&quot;</span>;</span>
+<span class="line" id="L811"></span>
+<span class="line" id="L812">        <span class="tok-kw">var</span> ptr: []<span class="tok-kw">const</span> <span class="tok-type">u8</span> = buf[<span class="tok-number">0</span>..];</span>
+<span class="line" id="L813">        <span class="tok-kw">var</span> result = JsonReader.parse(allocator, &amp;ptr, <span class="tok-type">u32</span>);</span>
+<span class="line" id="L814">        <span class="tok-kw">try</span> std.testing.expectError(<span class="tok-kw">error</span>.UnexpectedCharacter, result);</span>
+<span class="line" id="L815">    }</span>
+<span class="line" id="L816"></span>
+<span class="line" id="L817">    <span class="tok-comment">// Unexpected EOF</span>
 </span>
-<span class="line" id="L819">    {</span>
-<span class="line" id="L820">        <span class="tok-kw">const</span> Struct = <span class="tok-kw">struct</span> {</span>
-<span class="line" id="L821">            hello: <span class="tok-type">u32</span>,</span>
-<span class="line" id="L822">            world: <span class="tok-type">u32</span>,</span>
-<span class="line" id="L823">        };</span>
-<span class="line" id="L824"></span>
-<span class="line" id="L825">        <span class="tok-kw">const</span> buf = <span class="tok-str">&quot;{\&quot;hello&quot;</span>;</span>
-<span class="line" id="L826"></span>
-<span class="line" id="L827">        <span class="tok-kw">var</span> ptr: []<span class="tok-kw">const</span> <span class="tok-type">u8</span> = buf[<span class="tok-number">0</span>..];</span>
-<span class="line" id="L828">        <span class="tok-kw">var</span> result = JsonReader.parse(allocator, &amp;ptr, Struct);</span>
-<span class="line" id="L829">        <span class="tok-kw">try</span> std.testing.expectError(<span class="tok-kw">error</span>.EndOfBuffer, result);</span>
-<span class="line" id="L830">    }</span>
-<span class="line" id="L831"></span>
-<span class="line" id="L832">    <span class="tok-comment">// Missing field</span>
+<span class="line" id="L818">    {</span>
+<span class="line" id="L819">        <span class="tok-kw">const</span> Struct = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L820">            hello: <span class="tok-type">u32</span>,</span>
+<span class="line" id="L821">            world: <span class="tok-type">u32</span>,</span>
+<span class="line" id="L822">        };</span>
+<span class="line" id="L823"></span>
+<span class="line" id="L824">        <span class="tok-kw">const</span> buf = <span class="tok-str">&quot;{\&quot;hello&quot;</span>;</span>
+<span class="line" id="L825"></span>
+<span class="line" id="L826">        <span class="tok-kw">var</span> ptr: []<span class="tok-kw">const</span> <span class="tok-type">u8</span> = buf[<span class="tok-number">0</span>..];</span>
+<span class="line" id="L827">        <span class="tok-kw">var</span> result = JsonReader.parse(allocator, &amp;ptr, Struct);</span>
+<span class="line" id="L828">        <span class="tok-kw">try</span> std.testing.expectError(<span class="tok-kw">error</span>.EndOfBuffer, result);</span>
+<span class="line" id="L829">    }</span>
+<span class="line" id="L830"></span>
+<span class="line" id="L831">    <span class="tok-comment">// Missing field</span>
 </span>
-<span class="line" id="L833">    {</span>
-<span class="line" id="L834">        <span class="tok-kw">const</span> Struct = <span class="tok-kw">struct</span> {</span>
-<span class="line" id="L835">            hello: <span class="tok-type">u32</span>,</span>
-<span class="line" id="L836">            world: <span class="tok-type">u32</span>,</span>
-<span class="line" id="L837">        };</span>
-<span class="line" id="L838"></span>
-<span class="line" id="L839">        <span class="tok-kw">const</span> buf = <span class="tok-str">&quot;{\&quot;hello\&quot;:\&quot;0x20\&quot;}&quot;</span>;</span>
-<span class="line" id="L840"></span>
-<span class="line" id="L841">        <span class="tok-kw">var</span> ptr: []<span class="tok-kw">const</span> <span class="tok-type">u8</span> = buf[<span class="tok-number">0</span>..];</span>
-<span class="line" id="L842">        <span class="tok-kw">var</span> result = JsonReader.parse(allocator, &amp;ptr, Struct);</span>
-<span class="line" id="L843">        <span class="tok-kw">try</span> std.testing.expectError(<span class="tok-kw">error</span>.MissingRequiredField, result);</span>
-<span class="line" id="L844">    }</span>
-<span class="line" id="L845">}</span>
-<span class="line" id="L846"></span>
-<span class="line" id="L847"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> JsonDef = <span class="tok-kw">struct</span> {</span>
-<span class="line" id="L848">    field_name: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
-<span class="line" id="L849">};</span>
-<span class="line" id="L850"></span>
-<span class="line" id="L851"><span class="tok-kw">fn</span> <span class="tok-fn">getJsonDef</span>(<span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>, <span class="tok-kw">comptime</span> field_name: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) JsonDef {</span>
-<span class="line" id="L852">    <span class="tok-kw">const</span> TI = <span class="tok-builtin">@typeInfo</span>(T);</span>
-<span class="line" id="L853"></span>
-<span class="line" id="L854">    std.debug.assert(TI == .Struct);</span>
-<span class="line" id="L855"></span>
-<span class="line" id="L856">    <span class="tok-kw">if</span> (<span class="tok-builtin">@hasDecl</span>(T, <span class="tok-str">&quot;json_def&quot;</span>)) {</span>
-<span class="line" id="L857">        <span class="tok-kw">const</span> json_defs = T.json_def;</span>
-<span class="line" id="L858">        <span class="tok-kw">if</span> (<span class="tok-builtin">@hasField</span>(<span class="tok-builtin">@TypeOf</span>(json_defs), field_name)) {</span>
-<span class="line" id="L859">            <span class="tok-kw">return</span> <span class="tok-builtin">@field</span>(T.json_def, field_name);</span>
-<span class="line" id="L860">        }</span>
-<span class="line" id="L861">    }</span>
-<span class="line" id="L862"></span>
-<span class="line" id="L863">    <span class="tok-kw">return</span> JsonDef{</span>
-<span class="line" id="L864">        .field_name = field_name,</span>
-<span class="line" id="L865">    };</span>
-<span class="line" id="L866">}</span>
-<span class="line" id="L867"></span>
-<span class="line" id="L868"><span class="tok-kw">test</span> <span class="tok-str">&quot;json def&quot;</span> {</span>
-<span class="line" id="L869">    <span class="tok-kw">const</span> web3 = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;web3.zig&quot;</span>);</span>
-<span class="line" id="L870">    <span class="tok-kw">const</span> json_def = getJsonDef(web3.abi.AbiEntry, <span class="tok-str">&quot;state_mutability&quot;</span>);</span>
-<span class="line" id="L871">    std.debug.assert(std.mem.eql(<span class="tok-type">u8</span>, json_def.field_name, <span class="tok-str">&quot;stateMutability&quot;</span>));</span>
-<span class="line" id="L872">}</span>
-<span class="line" id="L873"></span>
+<span class="line" id="L832">    {</span>
+<span class="line" id="L833">        <span class="tok-kw">const</span> Struct = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L834">            hello: <span class="tok-type">u32</span>,</span>
+<span class="line" id="L835">            world: <span class="tok-type">u32</span>,</span>
+<span class="line" id="L836">        };</span>
+<span class="line" id="L837"></span>
+<span class="line" id="L838">        <span class="tok-kw">const</span> buf = <span class="tok-str">&quot;{\&quot;hello\&quot;:\&quot;0x20\&quot;}&quot;</span>;</span>
+<span class="line" id="L839"></span>
+<span class="line" id="L840">        <span class="tok-kw">var</span> ptr: []<span class="tok-kw">const</span> <span class="tok-type">u8</span> = buf[<span class="tok-number">0</span>..];</span>
+<span class="line" id="L841">        <span class="tok-kw">var</span> result = JsonReader.parse(allocator, &amp;ptr, Struct);</span>
+<span class="line" id="L842">        <span class="tok-kw">try</span> std.testing.expectError(<span class="tok-kw">error</span>.MissingRequiredField, result);</span>
+<span class="line" id="L843">    }</span>
+<span class="line" id="L844">}</span>
+<span class="line" id="L845"></span>
+<span class="line" id="L846"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> JsonDef = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L847">    field_name: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
+<span class="line" id="L848">};</span>
+<span class="line" id="L849"></span>
+<span class="line" id="L850"><span class="tok-kw">fn</span> <span class="tok-fn">getJsonDef</span>(<span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>, <span class="tok-kw">comptime</span> field_name: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) JsonDef {</span>
+<span class="line" id="L851">    <span class="tok-kw">const</span> TI = <span class="tok-builtin">@typeInfo</span>(T);</span>
+<span class="line" id="L852"></span>
+<span class="line" id="L853">    std.debug.assert(TI == .Struct);</span>
+<span class="line" id="L854"></span>
+<span class="line" id="L855">    <span class="tok-kw">if</span> (<span class="tok-builtin">@hasDecl</span>(T, <span class="tok-str">&quot;json_def&quot;</span>)) {</span>
+<span class="line" id="L856">        <span class="tok-kw">const</span> json_defs = T.json_def;</span>
+<span class="line" id="L857">        <span class="tok-kw">if</span> (<span class="tok-builtin">@hasField</span>(<span class="tok-builtin">@TypeOf</span>(json_defs), field_name)) {</span>
+<span class="line" id="L858">            <span class="tok-kw">return</span> <span class="tok-builtin">@field</span>(T.json_def, field_name);</span>
+<span class="line" id="L859">        }</span>
+<span class="line" id="L860">    }</span>
+<span class="line" id="L861"></span>
+<span class="line" id="L862">    <span class="tok-kw">return</span> JsonDef{</span>
+<span class="line" id="L863">        .field_name = field_name,</span>
+<span class="line" id="L864">    };</span>
+<span class="line" id="L865">}</span>
+<span class="line" id="L866"></span>
+<span class="line" id="L867"><span class="tok-kw">test</span> <span class="tok-str">&quot;json def&quot;</span> {</span>
+<span class="line" id="L868">    <span class="tok-kw">const</span> web3 = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;web3.zig&quot;</span>);</span>
+<span class="line" id="L869">    <span class="tok-kw">const</span> json_def = getJsonDef(web3.abi.AbiEntry, <span class="tok-str">&quot;state_mutability&quot;</span>);</span>
+<span class="line" id="L870">    std.debug.assert(std.mem.eql(<span class="tok-type">u8</span>, json_def.field_name, <span class="tok-str">&quot;stateMutability&quot;</span>));</span>
+<span class="line" id="L871">}</span>
+<span class="line" id="L872"></span>
 </code></pre></body>
 </html>

@@ -119,7 +119,7 @@ pub const Contract = struct {
         std.debug.assert(entry.name != null);
         std.debug.assert(entry.type == .function);
 
-        const arg_size = encoder.size();
+        const arg_size = encoder.getEncodedLength();
 
         var calldata = try self.allocator.alloc(u8, 4 + arg_size);
         defer self.allocator.free(calldata);

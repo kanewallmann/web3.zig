@@ -241,12 +241,6 @@ pub const EmptyArray = struct {
 pub const AbiType = union(enum) {
     const Self = @This();
 
-    // Common typedefs
-    pub const uint256 = Self{ .uint = .{ .bits = 256 } };
-    pub const uint8 = Self{ .uint = .{ .bits = 8 } };
-    pub const int256 = Self{ .int = .{ .bits = 256 } };
-    pub const address = Self{ .address = void{} };
-
     /// uint<M>
     uint: struct {
         bits: u16,
@@ -288,6 +282,14 @@ pub const AbiType = union(enum) {
     string: void,
     /// (T1,T2,...,Tn)
     tuple: []AbiType,
+
+    pub fn getChildType(self: *const Self) *AbiType {
+        switch (self.*) {
+            .fixed_array => |fixed_array_t| return fixed_array_t.child,
+            .array => |array_t| return array_t,
+            else => @panic("Not an array"),
+        }
+    }
 
     /// Recursively frees memory associated with this type
     pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {

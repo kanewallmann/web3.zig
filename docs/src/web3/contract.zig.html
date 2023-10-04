@@ -232,7 +232,7 @@
 <span class="line" id="L119">        std.debug.assert(entry.name != <span class="tok-null">null</span>);</span>
 <span class="line" id="L120">        std.debug.assert(entry.<span class="tok-type">type</span> == .function);</span>
 <span class="line" id="L121"></span>
-<span class="line" id="L122">        <span class="tok-kw">const</span> arg_size = encoder.size();</span>
+<span class="line" id="L122">        <span class="tok-kw">const</span> arg_size = encoder.getEncodedLength();</span>
 <span class="line" id="L123"></span>
 <span class="line" id="L124">        <span class="tok-kw">var</span> calldata = <span class="tok-kw">try</span> self.allocator.alloc(<span class="tok-type">u8</span>, <span class="tok-number">4</span> + arg_size);</span>
 <span class="line" id="L125">        <span class="tok-kw">defer</span> self.allocator.free(calldata);</span>
