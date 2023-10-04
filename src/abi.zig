@@ -472,14 +472,19 @@ pub const CalldataArgEncoder = struct {
             },
             .Pointer => |ptr_t| {
                 if (ptr_t.child == u8) {
+                    var size: u8 = 0;
                     switch (arg_type.*) {
                         .bytes => |bytes_t| {
-                            @memset(buffer, 0);
-                            @memcpy(buffer[0..bytes_t.size], arg[0..bytes_t.size]);
-                            return offset;
+                            size = bytes_t.size;
+                        },
+                        .function => {
+                            size = 24;
                         },
                         else => return error.InvalidCoercion,
                     }
+                    @memset(buffer, 0);
+                    @memcpy(buffer[0..size], arg[0..size]);
+                    return offset;
                 } else {
                     return error.InvalidCoercion;
                 }
@@ -644,6 +649,15 @@ pub fn decodeArg(allocator: std.mem.Allocator, buffer: []const u8, offset: usize
 
                     var val: T = undefined;
                     @memcpy(&val, buffer[offset..][0..bytes_t.size]);
+                    return val;
+                },
+                .function => {
+                    if (array_t.child != u8 or array_t.len != 24) {
+                        return error.InvalidCoercion;
+                    }
+
+                    var val: T = undefined;
+                    @memcpy(&val, buffer[offset..][0..24]);
                     return val;
                 },
                 else => return error.InvalidCoercion,

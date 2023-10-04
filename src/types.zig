@@ -342,6 +342,9 @@ pub const AbiType = union(enum) {
             .string => {
                 _ = try writer.write("string");
             },
+            .function => {
+                _ = try writer.write("function");
+            },
             .bytes => |bytes_t| {
                 _ = try writer.write("bytes");
                 try std.fmt.formatInt(bytes_t.size, 10, .lower, .{}, writer);
@@ -941,6 +944,8 @@ test "type parsing" {
         "address",
         "bool",
         "bytes32[3]",
+        "bytes32[3]",
+        "function",
     };
 
     for (inputs) |input| {

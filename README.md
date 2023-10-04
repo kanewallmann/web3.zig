@@ -76,7 +76,7 @@ This is a list of what has been implemented and what is planned.
 - ✅ string
 - ❌ fixed\<M>x\<N>
 - ❌ ufixed\<M>x\<N>
-- ❌ function
+- ✅ function
 - ✅ bytes\<M>
 - ❌ bytes
 - ❌ (T1,T2,...,Tn) (aka tuples/structs)
