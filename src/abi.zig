@@ -245,8 +245,8 @@ pub const CalldataArgEncoder = struct {
     const Self = @This();
 
     const Word = union(enum) {
-        pointer: usize,
-        literal: usize,
+        pointer: usize, // Signifies this slot should be a pointer into the dynamic block
+        literal: usize, // Signifies the data is at this location in the data buffer
     };
 
     args: std.ArrayList(Word),
@@ -338,8 +338,16 @@ pub const CalldataArgEncoder = struct {
                     @compileError("Cannot coerce non-slice pointer");
                 }
 
-                const offset = try self.writeDynamic(arg_type, arg);
-                return Word{ .pointer = offset };
+                switch (arg_type.*) {
+                    .bytes => {
+                        const offset = try self.writeStatic(arg_type, arg);
+                        return Word{ .literal = offset };
+                    },
+                    else => {
+                        const offset = try self.writeDynamic(arg_type, arg);
+                        return Word{ .pointer = offset };
+                    },
+                }
             },
             else => {
                 const offset = try self.writeStatic(arg_type, arg);
@@ -449,20 +457,31 @@ pub const CalldataArgEncoder = struct {
             },
             .Struct => |struct_t| {
                 _ = struct_t;
-                switch (@TypeOf(arg)) {
-                    web3.Address => {
-                        switch (arg_type.*) {
-                            .address => {
-                                @memset(buffer[32..], 0);
-                                @memcpy(buffer[44..][0..20], arg.raw[0..20]);
-                                return offset;
-                            },
-                            else => return error.InvalidCoercion,
-                        }
-                    },
-                    else => {
-                        return error.InvalidCoercion;
-                    },
+                if (@TypeOf(arg) == web3.Address) {
+                    switch (arg_type.*) {
+                        .address => {
+                            @memset(buffer[32..], 0);
+                            @memcpy(buffer[44..][0..20], arg.raw[0..20]);
+                            return offset;
+                        },
+                        else => return error.InvalidCoercion,
+                    }
+                } else {
+                    return error.InvalidCoercion;
+                }
+            },
+            .Pointer => |ptr_t| {
+                if (ptr_t.child == u8) {
+                    switch (arg_type.*) {
+                        .bytes => |bytes_t| {
+                            @memset(buffer, 0);
+                            @memcpy(buffer[0..bytes_t.size], arg[0..bytes_t.size]);
+                            return offset;
+                        },
+                        else => return error.InvalidCoercion,
+                    }
+                } else {
+                    return error.InvalidCoercion;
                 }
             },
             else => return error.InvalidCoercion,
@@ -616,6 +635,15 @@ pub fn decodeArg(allocator: std.mem.Allocator, buffer: []const u8, offset: usize
                         val[i] = try decodeArg(allocator, buffer, data_position + (i * 32), abi_fixed_array_t.child, array_t.child);
                     }
 
+                    return val;
+                },
+                .bytes => |bytes_t| {
+                    if (array_t.child != u8 or array_t.len != bytes_t.size) {
+                        return error.InvalidCoercion;
+                    }
+
+                    var val: T = undefined;
+                    @memcpy(&val, buffer[offset..][0..bytes_t.size]);
                     return val;
                 },
                 else => return error.InvalidCoercion,
@@ -821,6 +849,31 @@ test "encode" {
 
         assert(std.mem.eql(u8, data, expected_bytes));
     }
+
+    // bytes<M>
+    {
+        var encoder = CalldataArgEncoder.init(allocator);
+        defer encoder.deinit();
+
+        const abi_type = web3.AbiType{
+            .bytes = .{ .size = 8 },
+        };
+
+        const bytes: [8]u8 = .{ 1, 2, 3, 4, 5, 6, 7, 8 };
+
+        try encoder.append(&abi_type, bytes);
+
+        const data = try encoder.encodeAlloc();
+        defer allocator.free(data);
+
+        const expected_data = try allocator.alloc(u8, 32 * 4);
+        defer allocator.free(expected_data);
+
+        const hex = "0102030405060708000000000000000000000000000000000000000000000000";
+        const expected_bytes = try std.fmt.hexToBytes(expected_data, hex);
+
+        assert(std.mem.eql(u8, data, expected_bytes));
+    }
 }
 
 test "decode" {
@@ -885,5 +938,24 @@ test "decode" {
         defer allocator.free(output);
 
         assert(std.mem.eql(u8, output, "Hello, world!"));
+    }
+
+    // bytes<M>
+    {
+        const input = "bytes8";
+
+        var typ = try web3.AbiType.fromStringAlloc(allocator, input);
+        defer typ.deinit(allocator);
+
+        const data = try allocator.alloc(u8, 32);
+        defer allocator.free(data);
+
+        const hex = "0102030405060708000000000000000000000000000000000000000000000000";
+        const bytes = try std.fmt.hexToBytes(data, hex);
+
+        var output: [8]u8 = undefined;
+        output = try decodeArg(allocator, bytes, 0, typ, @TypeOf(output));
+
+        assert(std.mem.eql(u8, &output, bytes[0..8]));
     }
 }

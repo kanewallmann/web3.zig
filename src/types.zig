@@ -241,6 +241,13 @@ pub const EmptyArray = struct {
 pub const AbiType = union(enum) {
     const Self = @This();
 
+    // Common typedefs
+    pub const uint256 = Self{ .uint = .{ .bits = 256 } };
+    pub const uint8 = Self{ .uint = .{ .bits = 8 } };
+    pub const int256 = Self{ .int = .{ .bits = 256 } };
+    pub const address = Self{ .address = void{} };
+    pub const boolean = Self{ .boolean = void{} };
+
     /// uint<M>
     uint: struct {
         bits: u16,
@@ -274,8 +281,12 @@ pub const AbiType = union(enum) {
     },
     /// <type>[]
     array: *AbiType,
+    /// bytes<M>
+    bytes: struct {
+        size: u8,
+    },
     /// bytes
-    bytes: void,
+    byte_array: void,
     /// function
     function: void,
     /// string
@@ -331,6 +342,10 @@ pub const AbiType = union(enum) {
             .string => {
                 _ = try writer.write("string");
             },
+            .bytes => |bytes_t| {
+                _ = try writer.write("bytes");
+                try std.fmt.formatInt(bytes_t.size, 10, .lower, .{}, writer);
+            },
             .array => |array_t| {
                 try array_t.format(fmt, opts, writer);
                 _ = try writer.write("[]");
@@ -349,7 +364,7 @@ pub const AbiType = union(enum) {
         .{ "address", Self{ .address = void{} } },
         .{ "bool", Self{ .boolean = void{} } },
         .{ "function", Self{ .function = void{} } },
-        .{ "bytes", Self{ .bytes = void{} } },
+        .{ "bytes", Self{ .byte_array = void{} } },
         .{ "string", Self{ .string = void{} } },
     });
 
@@ -383,6 +398,9 @@ pub const AbiType = union(enum) {
                 var bits = try std.fmt.parseInt(u16, child_buffer[3..], 10);
                 child.* = Self{ .int = .{ .bits = bits } };
             }
+        } else if (child_buffer.len >= 6 and std.mem.eql(u8, child_buffer[0..5], "bytes")) {
+            var size = try std.fmt.parseInt(u8, child_buffer[5..], 10);
+            child.* = Self{ .bytes = .{ .size = size } };
         } else {
             var found = false;
             inline for (fixed_types.kvs) |fixed_type| {
@@ -916,18 +934,27 @@ test "type parsing" {
     const allocator = std.testing.allocator;
     const assert = std.debug.assert;
 
-    const input = "uint256[5][10][]";
+    const inputs = [_][]const u8{
+        "uint256[5][10][]",
+        "bytes32",
+        "int256[]",
+        "address",
+        "bool",
+        "bytes32[3]",
+    };
 
-    var typ = try AbiType.fromStringAlloc(allocator, input);
-    defer typ.deinit(allocator);
+    for (inputs) |input| {
+        var typ = try AbiType.fromStringAlloc(allocator, input);
+        defer typ.deinit(allocator);
 
-    var output = try allocator.alloc(u8, input.len);
-    defer allocator.free(output);
+        var output = try allocator.alloc(u8, input.len);
+        defer allocator.free(output);
 
-    var stream = std.io.fixedBufferStream(output);
-    var writer = stream.writer();
+        var stream = std.io.fixedBufferStream(output);
+        var writer = stream.writer();
 
-    try writer.print("{}", .{typ});
+        try writer.print("{}", .{typ});
 
-    assert(std.mem.eql(u8, output, input));
+        assert(std.mem.eql(u8, output, input));
+    }
 }
