@@ -6,7 +6,7 @@ const parser_allocator = @import("parser_allocator.zig");
 /// Represents an input in an ABI entry
 pub const AbiInput = struct {
     name: ?[]const u8,
-    type: *web3.AbiType,
+    type: web3.AbiType,
     indexed: ?bool,
 
     pub fn deinit(self: AbiInput, allocator: std.mem.Allocator) void {
@@ -20,7 +20,7 @@ pub const AbiInput = struct {
 /// Reperesents an output in an ABI entry
 pub const AbiOutput = struct {
     name: ?[]const u8,
-    type: *web3.AbiType,
+    type: web3.AbiType,
 
     pub fn deinit(self: AbiOutput, allocator: std.mem.Allocator) void {
         if (self.name) |name| {
@@ -200,7 +200,7 @@ pub const Abi = struct {
     }
 
     /// Finds an ABI entry with matching method name and args
-    pub fn findEntry(self: *const Self, method: []const u8, arg_types: []*const web3.AbiType) !?*web3.abi.AbiEntry {
+    pub fn findEntry(self: *const Self, method: []const u8, arg_types: []web3.AbiType) !?*web3.abi.AbiEntry {
         var entry: ?*web3.abi.AbiEntry = data: for (self.entries) |*entry| {
             if (entry.name) |entry_name| {
                 if (std.mem.eql(u8, method, entry_name)) {
@@ -270,45 +270,37 @@ pub const CalldataArgEncoder = struct {
         self.data.clearAndFree();
     }
 
-    fn isDynamic(abi_type: *const web3.AbiType) bool {
-        switch (abi_type.*) {
-            .bytes => return true,
-            .string => return true,
-            .array => return true,
-            .fixed_array => |fixed_array_t| {
-                if (fixed_array_t.size == 0) {
-                    return false;
-                }
-                return isDynamic(fixed_array_t.child);
-            },
-            .tuple => |tuple_t| {
-                for (tuple_t) |*t| {
-                    if (isDynamic(t)) {
-                        return true;
-                    }
-                }
-                return false;
-            },
-            else => return false,
-        }
-    }
-
     fn newSlot(self: *Self) ![]u8 {
         try self.data.ensureUnusedCapacity(32);
         self.data.items.len += 32;
         return self.data.items[self.data.items.len - 32 ..][0..32];
     }
 
-    pub fn append(self: *Self, arg_type: *const web3.AbiType, arg: anytype) !void {
+    pub fn append(self: *Self, arg_type: web3.AbiType, arg: anytype) !void {
         const ATT = @typeInfo(@TypeOf(arg));
         switch (ATT) {
             .Pointer => |ptr_t| {
                 if (ptr_t.size == .Slice) {
-                    switch (arg_type.*) {
+                    switch (arg_type) {
                         .fixed_array => |fixed_array_t| {
-                            if (!isDynamic(arg_type)) {
+                            if (!arg_type.isDynamic()) {
                                 for (0..fixed_array_t.size) |i| {
-                                    try self.append(fixed_array_t.child, arg[i]);
+                                    try self.append(fixed_array_t.child.*, arg[i]);
+                                }
+                                return;
+                            }
+                        },
+                        else => {},
+                    }
+                }
+            },
+            .Struct => |struct_t| {
+                if (struct_t.is_tuple) {
+                    switch (arg_type) {
+                        .tuple => |tuple_t| {
+                            if (!arg_type.isDynamic()) {
+                                inline for (tuple_t, struct_t.fields) |child_type, field| {
+                                    try self.append(child_type, @field(arg, field.name));
                                 }
                                 return;
                             }
@@ -323,11 +315,11 @@ pub const CalldataArgEncoder = struct {
             },
             else => {},
         }
-        var word = try self.writeArg(arg_type, arg);
+        const word = try self.writeArg(arg_type, arg) orelse unreachable;
         try self.args.append(word);
     }
 
-    fn writeArg(self: *Self, arg_type: *const web3.AbiType, arg: anytype) !Word {
+    fn writeArg(self: *Self, arg_type: web3.AbiType, arg: anytype) !?Word {
         const ATT = @typeInfo(@TypeOf(arg));
         switch (ATT) {
             .Array => {
@@ -338,29 +330,58 @@ pub const CalldataArgEncoder = struct {
                     @compileError("Cannot coerce non-slice pointer");
                 }
 
-                switch (arg_type.*) {
+                switch (arg_type) {
                     .bytes => {
                         const offset = try self.writeStatic(arg_type, arg);
                         return Word{ .literal = offset };
                     },
                     else => {
-                        const offset = try self.writeDynamic(arg_type, arg);
-                        return Word{ .pointer = offset };
+                        if (!arg_type.isDynamic()) {
+                            for (arg) |item| {
+                                if (try self.writeArg(arg_type.getChildType(), item)) |word| {
+                                    try self.extra_args.append(word);
+                                }
+                            }
+                            return null;
+                        } else {
+                            const offset = try self.writeDynamic(arg_type, arg);
+                            return Word{ .pointer = offset };
+                        }
                     },
                 }
             },
-            else => {
-                const offset = try self.writeStatic(arg_type, arg);
-                return Word{ .literal = offset };
+            .Struct => |struct_t| {
+                if (struct_t.is_tuple) {
+                    switch (arg_type) {
+                        .tuple => |tuple_t| {
+                            if (!arg_type.isDynamic()) {
+                                inline for (tuple_t, struct_t.fields) |child_type, field| {
+                                    if (try self.writeArg(child_type, @field(arg, field.name))) |word| {
+                                        try self.extra_args.append(word);
+                                    }
+                                }
+                                return null;
+                            } else {
+                                const offset = try self.writeDynamic(arg_type, arg);
+                                return Word{ .pointer = offset };
+                            }
+                        },
+                        else => return error.InvalidCoercion,
+                    }
+                }
             },
+            else => {},
         }
+
+        const offset = try self.writeStatic(arg_type, arg);
+        return Word{ .literal = offset };
     }
 
-    fn writeDynamic(self: *Self, arg_type: *const web3.AbiType, arg: anytype) !usize {
+    fn writeDynamic(self: *Self, arg_type: web3.AbiType, arg: anytype) !usize {
         const TI = @typeInfo(@TypeOf(arg));
 
         if (TI == .Pointer and TI.Pointer.child == u8) {
-            switch (arg_type.*) {
+            switch (arg_type) {
                 .string => {
                     const len_offset = self.data.items.len;
                     const len_buffer = try self.newSlot();
@@ -383,28 +404,36 @@ pub const CalldataArgEncoder = struct {
                 },
                 else => {},
             }
+        } else if (TI == .Struct) {
+            const offset = self.data.items.len;
+            inline for (arg_type.tuple, TI.Struct.fields) |child_type, field| {
+                _ = try self.writeArg(child_type, @field(arg, field.name));
+            }
+            return offset;
         }
 
+        // Must be an array
         const offset = self.data.items.len;
         const len_slot = try self.newSlot();
         std.mem.writeIntBig(u256, len_slot[0..32], arg.len);
         try self.extra_args.append(Word{ .literal = offset });
 
         for (arg) |item| {
-            var word = try self.writeArg(arg_type.getChildType(), item);
-            try self.extra_args.append(word);
+            if (try self.writeArg(arg_type.getChildType(), item)) |word| {
+                try self.extra_args.append(word);
+            }
         }
         return offset;
     }
 
-    fn writeStatic(self: *Self, arg_type: *const web3.AbiType, arg: anytype) !usize {
+    fn writeStatic(self: *Self, arg_type: web3.AbiType, arg: anytype) !usize {
         const offset = self.data.items.len;
         const buffer = try self.newSlot();
 
         const ATT = @typeInfo(@TypeOf(arg));
         switch (ATT) {
             .Bool => {
-                switch (arg_type.*) {
+                switch (arg_type) {
                     .boolean => {
                         @memset(buffer, 0);
                         if (arg) {
@@ -418,7 +447,7 @@ pub const CalldataArgEncoder = struct {
             .Int => |arg_int| {
                 switch (arg_int.signedness) {
                     .signed => {
-                        switch (arg_type.*) {
+                        switch (arg_type) {
                             .int => |int| {
                                 const arg_i256: i256 = @intCast(arg);
                                 const max_value: u256 = std.math.pow(u256, 2, int.bits - 1) - 1;
@@ -437,7 +466,7 @@ pub const CalldataArgEncoder = struct {
                         }
                     },
                     .unsigned => {
-                        switch (arg_type.*) {
+                        switch (arg_type) {
                             .uint => |uint| {
                                 const arg_u256: u256 = @intCast(arg);
                                 if (uint.bits < 256) {
@@ -458,7 +487,7 @@ pub const CalldataArgEncoder = struct {
             .Struct => |struct_t| {
                 _ = struct_t;
                 if (@TypeOf(arg) == web3.Address) {
-                    switch (arg_type.*) {
+                    switch (arg_type) {
                         .address => {
                             @memset(buffer[32..], 0);
                             @memcpy(buffer[44..][0..20], arg.raw[0..20]);
@@ -473,7 +502,7 @@ pub const CalldataArgEncoder = struct {
             .Pointer => |ptr_t| {
                 if (ptr_t.child == u8) {
                     var size: u8 = 0;
-                    switch (arg_type.*) {
+                    switch (arg_type) {
                         .bytes => |bytes_t| {
                             size = bytes_t.size;
                         },
@@ -561,7 +590,7 @@ pub fn parseJson(allocator: std.mem.Allocator, abi: []const u8) !Abi {
 /// `arg_type` is the ABI type of the argument.
 /// `T` is the type to coerce the data into.
 /// Errors if data does not match expected format or if coercion to given type is not possible.
-pub fn decodeArg(allocator: std.mem.Allocator, buffer: []const u8, offset: usize, arg_type: *const web3.AbiType, comptime T: type) !T {
+pub fn decodeArg(allocator: std.mem.Allocator, buffer: []const u8, offset: usize, arg_type: web3.AbiType, comptime T: type) !T {
     const TI = @typeInfo(T);
 
     if (offset + 32 > buffer.len) {
@@ -572,7 +601,7 @@ pub fn decodeArg(allocator: std.mem.Allocator, buffer: []const u8, offset: usize
         .Int => |int_t| {
             switch (int_t.signedness) {
                 .unsigned => {
-                    switch (arg_type.*) {
+                    switch (arg_type) {
                         .uint => |uint| {
                             const arg_u256 = std.mem.readIntBig(u256, buffer[offset..][0..32]);
                             if (uint.bits < 256) {
@@ -587,7 +616,7 @@ pub fn decodeArg(allocator: std.mem.Allocator, buffer: []const u8, offset: usize
                     }
                 },
                 .signed => {
-                    switch (arg_type.*) {
+                    switch (arg_type) {
                         .int => |int| {
                             const arg_i256 = std.mem.readIntBig(i256, buffer[offset..][0..32]);
                             if (int.bits < 256) {
@@ -608,13 +637,29 @@ pub fn decodeArg(allocator: std.mem.Allocator, buffer: []const u8, offset: usize
             }
         },
         .Struct => |struct_t| {
-            _ = struct_t;
             if (T == web3.Address) {
-                switch (arg_type.*) {
+                switch (arg_type) {
                     .address => {
                         var val: web3.Address = undefined;
                         @memcpy(&val.raw, buffer[offset + 12 ..][0..20]);
                         return val;
+                    },
+                    else => return error.InvalidCoercion,
+                }
+            } else if (struct_t.is_tuple) {
+                switch (arg_type) {
+                    .tuple => |tuple_t| {
+                        if (arg_type.isDynamic()) {
+                            const tuple_offset = std.mem.readIntBig(i256, buffer[offset..][0..32]);
+
+                            var val: T = undefined;
+
+                            inline for (tuple_t, struct_t.fields) |child_arg_type, field| {
+                                @field(val, field.name) = try decodeArg(allocator, buffer, tuple_offset, child_arg_type, field.type);
+                            }
+
+                            return val;
+                        } else {}
                     },
                     else => return error.InvalidCoercion,
                 }
@@ -626,7 +671,7 @@ pub fn decodeArg(allocator: std.mem.Allocator, buffer: []const u8, offset: usize
             return arg_u256 != 0;
         },
         .Array => |array_t| {
-            switch (arg_type.*) {
+            switch (arg_type) {
                 .fixed_array => |abi_fixed_array_t| {
                     if (abi_fixed_array_t.size != array_t.len) {
                         return error.InvalidCoercion;
@@ -637,7 +682,7 @@ pub fn decodeArg(allocator: std.mem.Allocator, buffer: []const u8, offset: usize
                     var val: T = undefined;
 
                     for (0..array_t.len) |i| {
-                        val[i] = try decodeArg(allocator, buffer, data_position + (i * 32), abi_fixed_array_t.child, array_t.child);
+                        val[i] = try decodeArg(allocator, buffer, data_position + (i * 32), abi_fixed_array_t.child.*, array_t.child);
                     }
 
                     return val;
@@ -664,7 +709,7 @@ pub fn decodeArg(allocator: std.mem.Allocator, buffer: []const u8, offset: usize
             }
         },
         .Pointer => |ptr_t| {
-            switch (arg_type.*) {
+            switch (arg_type) {
                 .string => {
                     if (ptr_t.child != u8 or ptr_t.size != .Slice) {
                         return error.InvalidCoercion;
@@ -700,7 +745,7 @@ pub fn decodeArg(allocator: std.mem.Allocator, buffer: []const u8, offset: usize
 }
 
 /// Encodes a function signature into the supplied buffer
-pub fn encodeFunctionSelectorBuf(out_buffer: []u8, method: []const u8, arg_types: []*const web3.AbiType) !void {
+pub fn encodeFunctionSelectorBuf(out_buffer: []u8, method: []const u8, arg_types: []web3.AbiType) !void {
     // Allocate temporary memory to construct the function sig
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     var allocator = gpa.allocator();
@@ -746,8 +791,8 @@ test "encode" {
             .boolean = void{},
         };
 
-        try encoder.append(&abi_type, true);
-        try encoder.append(&abi_type, false);
+        try encoder.append(abi_type, true);
+        try encoder.append(abi_type, false);
 
         const data = try encoder.encodeAlloc();
         defer allocator.free(data);
@@ -774,7 +819,7 @@ test "encode" {
 
         var bools = [_]bool{ true, false };
 
-        try encoder.append(&array_abi_type, bools);
+        try encoder.append(array_abi_type, bools);
 
         const data = try encoder.encodeAlloc();
         defer allocator.free(data);
@@ -802,7 +847,7 @@ test "encode" {
 
         var uints: [2]u64 = [_]u64{ 123, 456 };
 
-        try encoder.append(&array_abi_type, uints);
+        try encoder.append(array_abi_type, uints);
 
         const data = try encoder.encodeAlloc();
         defer allocator.free(data);
@@ -825,7 +870,7 @@ test "encode" {
             .uint = .{ .bits = 256 },
         };
 
-        try encoder.append(&abi_type, @as(u256, 123));
+        try encoder.append(abi_type, @as(u256, 123));
 
         const data = try encoder.encodeAlloc();
         defer allocator.free(data);
@@ -850,7 +895,7 @@ test "encode" {
 
         const string: []const u8 = "Hello, world!";
 
-        try encoder.append(&abi_type, string);
+        try encoder.append(abi_type, string);
 
         const data = try encoder.encodeAlloc();
         defer allocator.free(data);
@@ -875,7 +920,7 @@ test "encode" {
 
         const bytes: [8]u8 = .{ 1, 2, 3, 4, 5, 6, 7, 8 };
 
-        try encoder.append(&abi_type, bytes);
+        try encoder.append(abi_type, bytes);
 
         const data = try encoder.encodeAlloc();
         defer allocator.free(data);
@@ -884,6 +929,100 @@ test "encode" {
         defer allocator.free(expected_data);
 
         const hex = "0102030405060708000000000000000000000000000000000000000000000000";
+        const expected_bytes = try std.fmt.hexToBytes(expected_data, hex);
+
+        assert(std.mem.eql(u8, data, expected_bytes));
+    }
+
+    // Tuple
+    {
+        var encoder = CalldataArgEncoder.init(allocator);
+        defer encoder.deinit();
+
+        const abi_type = web3.AbiType{
+            .tuple = try allocator.alloc(web3.AbiType, 2),
+        };
+        defer abi_type.deinit(allocator);
+
+        abi_type.tuple[0] = web3.AbiType.uint256;
+        abi_type.tuple[1] = web3.AbiType.uint256;
+
+        try encoder.append(abi_type, .{ @as(u32, 100), @as(u32, 200) });
+
+        const data = try encoder.encodeAlloc();
+        defer allocator.free(data);
+
+        const expected_data = try allocator.alloc(u8, 32 * 2);
+        defer allocator.free(expected_data);
+
+        const hex = "000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000000000000000000000000000000000c8";
+        const expected_bytes = try std.fmt.hexToBytes(expected_data, hex);
+
+        assert(std.mem.eql(u8, data, expected_bytes));
+    }
+
+    // Dynamic tuple
+    {
+        var encoder = CalldataArgEncoder.init(allocator);
+        defer encoder.deinit();
+
+        const abi_type = web3.AbiType{
+            .tuple = try allocator.alloc(web3.AbiType, 2),
+        };
+        defer abi_type.deinit(allocator);
+
+        abi_type.tuple[0] = web3.AbiType.string;
+        abi_type.tuple[1] = web3.AbiType.string;
+
+        const string_a: []const u8 = "Hello,";
+        const string_b: []const u8 = "world!";
+
+        try encoder.append(abi_type, .{ string_a, string_b });
+
+        const data = try encoder.encodeAlloc();
+        defer allocator.free(data);
+
+        const expected_data = try allocator.alloc(u8, 32 * 5);
+        defer allocator.free(expected_data);
+
+        const hex = "0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000648656c6c6f2c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006776f726c64210000000000000000000000000000000000000000000000000000";
+        const expected_bytes = try std.fmt.hexToBytes(expected_data, hex);
+
+        assert(std.mem.eql(u8, data, expected_bytes));
+    }
+
+    // Tuple array
+    {
+        var encoder = CalldataArgEncoder.init(allocator);
+        defer encoder.deinit();
+
+        var tuple_abi_type = web3.AbiType{
+            .tuple = try allocator.alloc(web3.AbiType, 2),
+        };
+        defer tuple_abi_type.deinit(allocator);
+        tuple_abi_type.tuple[0] = web3.AbiType.uint256;
+        tuple_abi_type.tuple[1] = web3.AbiType.uint256;
+
+        const array_abi_type = web3.AbiType{
+            .array = &tuple_abi_type,
+        };
+
+        const Tuple = struct { u32, u32 };
+
+        const array = [_]Tuple{
+            .{ 100, 200 },
+            .{ 300, 400 },
+        };
+
+        try encoder.append(array_abi_type, array);
+
+        const data = try encoder.encodeAlloc();
+        defer allocator.free(data);
+
+        const expected_data = try allocator.alloc(u8, 32 * 6);
+        defer allocator.free(expected_data);
+
+        const hex = "00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000000000000000000000000000000000c8000000000000000000000000000000000000000000000000000000000000012c0000000000000000000000000000000000000000000000000000000000000190";
         const expected_bytes = try std.fmt.hexToBytes(expected_data, hex);
 
         assert(std.mem.eql(u8, data, expected_bytes));

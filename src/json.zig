@@ -651,14 +651,18 @@ pub const JsonReader = struct {
             if (@hasDecl(T, "fromJson")) {
                 return T.fromJson(allocator, buffer);
             } else {
-                if (buffer.*[0] == '"') {
-                    if (@hasDecl(T, "fromString")) {
+                if (@hasDecl(T, "fromString")) {
+                    if (buffer.*[0] == '"') {
                         const str = try parseString(buffer);
                         return T.fromString(str);
-                    } else if (@hasDecl(T, "fromStringAlloc")) {
+                    }
+                } else if (@hasDecl(T, "fromStringAlloc")) {
+                    if (buffer.*[0] == '"') {
                         const str = try parseString(buffer);
                         return try T.fromStringAlloc(allocator, str);
                     }
+                } else if (TI == .Union) {
+                    @compileError("Union requries a fromString or fromStringAlloc");
                 }
             }
         }
@@ -683,6 +687,9 @@ pub const JsonReader = struct {
                 } else {
                     return try parseTuple(allocator, buffer, T);
                 }
+            },
+            .Union => {
+                return error.ParserError;
             },
             .Pointer => |ptr| {
                 switch (ptr.size) {

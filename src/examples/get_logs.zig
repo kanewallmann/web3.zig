@@ -46,9 +46,9 @@ pub fn main() !void {
 
     // Manually decode and display results
     for (logs.raw) |log| {
-        const from = try web3.abi.decodeArg(allocator, &log.topics[1].raw, 0, &web3.AbiType.address, web3.Address);
-        const amount_reth = web3.Ether.wrap(try web3.abi.decodeArg(allocator, log.data.raw, 0, &web3.AbiType.uint256, u256));
-        const amount_eth = web3.Ether.wrap(try web3.abi.decodeArg(allocator, log.data.raw, 32, &web3.AbiType.uint256, u256));
+        const from = try web3.abi.decodeArg(allocator, &log.topics[1].raw, 0, web3.AbiType.address, web3.Address);
+        const amount_reth = web3.Ether.wrap(try web3.abi.decodeArg(allocator, log.data.raw, 0, web3.AbiType.uint256, u256));
+        const amount_eth = web3.Ether.wrap(try web3.abi.decodeArg(allocator, log.data.raw, 32, web3.AbiType.uint256, u256));
 
         // FixedPoint (and Ether) types support the precision option when formating values
         std.debug.print("{} burned {d:.6} rETH for {d:.6} ETH\n", .{ from, amount_reth, amount_eth });

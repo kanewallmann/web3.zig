@@ -1,6 +1,7 @@
 const std = @import("std");
 const json = @import("json.zig");
 const util = @import("util.zig");
+const parser_allocator = @import("parser_allocator.zig");
 
 /// Represents an Ethereum address of 20 bytes
 pub const Address = struct {
@@ -236,7 +237,7 @@ pub const EmptyArray = struct {
     }
 };
 
-/// Represents an ABI type. Requires heap allocation as the size of the type can be dynamic (e.g. uint256[3][4]).
+/// Represents an ABI type.
 /// Reference: https://docs.soliditylang.org/en/v0.8.2/abi-spec.html#types
 pub const AbiType = union(enum) {
     const Self = @This();
@@ -247,6 +248,7 @@ pub const AbiType = union(enum) {
     pub const int256 = Self{ .int = .{ .bits = 256 } };
     pub const address = Self{ .address = void{} };
     pub const boolean = Self{ .boolean = void{} };
+    pub const string = Self{ .string = void{} };
 
     /// uint<M>
     uint: struct {
@@ -294,22 +296,47 @@ pub const AbiType = union(enum) {
     /// (T1,T2,...,Tn)
     tuple: []AbiType,
 
-    pub fn getChildType(self: *const Self) *AbiType {
-        switch (self.*) {
-            .fixed_array => |fixed_array_t| return fixed_array_t.child,
-            .array => |array_t| return array_t,
+    pub fn getChildType(self: Self) AbiType {
+        switch (self) {
+            .fixed_array => |fixed_array_t| return fixed_array_t.child.*,
+            .array => |array_t| return array_t.*,
             else => @panic("Not an array"),
         }
     }
 
+    pub fn isDynamic(self: Self) bool {
+        switch (self) {
+            .bytes => return true,
+            .string => return true,
+            .array => return true,
+            .fixed_array => |fixed_array_t| {
+                if (fixed_array_t.size == 0) {
+                    return false;
+                }
+                return isDynamic(fixed_array_t.child.*);
+            },
+            .tuple => |tuple_t| {
+                for (tuple_t) |*t| {
+                    if (isDynamic(t.*)) {
+                        return true;
+                    }
+                }
+                return false;
+            },
+            else => return false,
+        }
+    }
+
     /// Recursively frees memory associated with this type
-    pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
-        switch (self.*) {
+    pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
+        switch (self) {
             .array => {
                 self.array.deinit(allocator);
+                allocator.destroy(self.array);
             },
             .fixed_array => {
                 self.fixed_array.child.deinit(allocator);
+                allocator.destroy(self.fixed_array.child);
             },
             .tuple => {
                 for (self.tuple) |*child| {
@@ -319,7 +346,6 @@ pub const AbiType = union(enum) {
             },
             else => {},
         }
-        allocator.destroy(self);
     }
 
     /// Format helper
@@ -337,7 +363,7 @@ pub const AbiType = union(enum) {
                 _ = try writer.write("address");
             },
             .boolean => {
-                _ = try writer.write("boolean");
+                _ = try writer.write("bool");
             },
             .string => {
                 _ = try writer.write("string");
@@ -359,6 +385,18 @@ pub const AbiType = union(enum) {
                 try std.fmt.formatInt(fixed_array_t.size, 10, .lower, .{}, writer);
                 try writer.writeByte(']');
             },
+            .tuple => |tuple_t| {
+                try writer.writeByte('(');
+                var first: bool = true;
+                for (tuple_t) |child_t| {
+                    if (!first) {
+                        try writer.writeByte(',');
+                    }
+                    first = false;
+                    try child_t.format(fmt, opts, writer);
+                }
+                try writer.writeByte(')');
+            },
             else => unreachable,
         }
     }
@@ -367,103 +405,166 @@ pub const AbiType = union(enum) {
         .{ "address", Self{ .address = void{} } },
         .{ "bool", Self{ .boolean = void{} } },
         .{ "function", Self{ .function = void{} } },
-        .{ "bytes", Self{ .byte_array = void{} } },
         .{ "string", Self{ .string = void{} } },
     });
 
     /// Parses the provided string and allocates an AbiType based on its contents
-    /// Caller should call `deinit` to recursively free memory
-    pub fn fromStringAlloc(allocator: std.mem.Allocator, buffer: []const u8) !*Self {
-        var child = try allocator.create(AbiType);
+    /// Return value may own allocated memory in the case of a dynamic type (e.g. uint256[3][4]).
+    /// User should call deinit when type is no longer needed to potentially free any owned memory.
+    pub fn fromStringAlloc(allocator: std.mem.Allocator, buffer: []const u8) !Self {
+        var local_buffer = buffer;
 
-        var array_start: usize = 0;
-        var child_buffer = buffer;
+        var arena = parser_allocator.ArenaAllocator.init(allocator);
+        errdefer arena.deinit();
+        var parent_allocator = arena.allocator();
 
-        for (0..buffer.len) |c| {
-            if (buffer[c] == '[') {
-                array_start = c;
-                child_buffer = buffer[0..c];
+        const result = parse(parent_allocator, &local_buffer);
+        arena.freeList();
+        return result;
+    }
+
+    fn parseInt(buffer: *[]const u8) !u32 {
+        var i: usize = 0;
+        while (i < buffer.len) : (i += 1) {
+            if (!std.ascii.isDigit(buffer.*[i])) {
                 break;
             }
         }
+        const int = try std.fmt.parseInt(u32, buffer.*[0..i], 10);
+        buffer.* = buffer.*[i..];
+        return int;
+    }
 
-        if (child_buffer.len >= 4 and std.mem.eql(u8, child_buffer[0..4], "uint")) {
-            if (child_buffer.len == 4) {
-                child.* = Self{ .uint = .{ .bits = 256 } };
-            } else {
-                var bits = try std.fmt.parseInt(u16, child_buffer[4..], 10);
-                child.* = Self{ .uint = .{ .bits = bits } };
+    fn parse(allocator: std.mem.Allocator, _buffer: *[]const u8) !Self {
+        var buffer = _buffer.*;
+        defer _buffer.* = buffer;
+
+        var child: Self = undefined;
+
+        if (buffer[0] == '(') {
+            var fields = try std.ArrayList(AbiType).initCapacity(allocator, 1);
+
+            var i: usize = 1;
+            _ = i;
+
+            buffer = buffer[1..];
+
+            while (buffer.len > 0) {
+                try fields.append(try parse(allocator, &buffer));
+
+                if (buffer.len == 0) {
+                    return error.ParserError;
+                }
+
+                switch (buffer[0]) {
+                    ',' => {
+                        buffer = buffer[1..];
+                    },
+                    ')' => {
+                        break;
+                    },
+                    else => return error.ParserError,
+                }
             }
-        } else if (child_buffer.len >= 3 and std.mem.eql(u8, child_buffer[0..3], "int")) {
-            if (child_buffer.len == 3) {
-                child.* = Self{ .int = .{ .bits = 256 } };
-            } else {
-                var bits = try std.fmt.parseInt(u16, child_buffer[3..], 10);
-                child.* = Self{ .int = .{ .bits = bits } };
+
+            if (buffer[0] != ')') {
+                return error.ParserError;
             }
-        } else if (child_buffer.len >= 6 and std.mem.eql(u8, child_buffer[0..5], "bytes")) {
-            var size = try std.fmt.parseInt(u8, child_buffer[5..], 10);
-            child.* = Self{ .bytes = .{ .size = size } };
+
+            buffer = buffer[1..];
+
+            child = Self{
+                .tuple = try fields.toOwnedSlice(),
+            };
+
+            if (buffer.len == 0) {
+                return child;
+            }
+        } else if (buffer.len >= 4 and std.mem.eql(u8, buffer[0..4], "uint")) {
+            buffer = buffer[4..];
+            var bits: u16 = 256;
+            if (buffer.len > 0 and std.ascii.isDigit(buffer[0])) {
+                bits = @intCast(try parseInt(&buffer));
+            }
+            child = Self{ .uint = .{ .bits = bits } };
+        } else if (buffer.len >= 3 and std.mem.eql(u8, buffer[0..3], "int")) {
+            buffer = buffer[3..];
+            var bits: u16 = 256;
+            if (buffer.len > 0 and std.ascii.isDigit(buffer[0])) {
+                bits = @intCast(try parseInt(&buffer));
+            }
+            child = Self{ .int = .{ .bits = bits } };
+        } else if (buffer.len >= 5 and std.mem.eql(u8, buffer[0..5], "bytes")) {
+            buffer = buffer[5..];
+            if (buffer.len > 0 and std.ascii.isDigit(buffer[0])) {
+                const bytes: u8 = @intCast(try parseInt(&buffer));
+                if (bytes == 0 or bytes > 32) {
+                    return error.ParserError;
+                }
+                child = Self{ .bytes = .{ .size = bytes } };
+            } else {
+                child = Self{ .byte_array = void{} };
+            }
         } else {
             var found = false;
             inline for (fixed_types.kvs) |fixed_type| {
-                if (child_buffer.len == fixed_type.key.len and std.mem.eql(u8, child_buffer[0..fixed_type.key.len], fixed_type.key)) {
-                    child.* = fixed_type.value;
+                if (buffer.len >= fixed_type.key.len and std.mem.eql(u8, buffer[0..fixed_type.key.len], fixed_type.key)) {
+                    child = fixed_type.value;
+                    buffer = buffer[fixed_type.key.len..];
                     found = true;
                     break;
                 }
             }
 
             if (!found) {
-                allocator.destroy(child);
                 return error.UnknownType;
             }
         }
 
-        if (array_start == 0) {
+        if (buffer.len == 0) {
             return child;
         }
 
-        var array_end = array_start;
-
-        while (array_end != buffer.len) : (array_end += 1) {
-            array_start = array_end;
-
-            if (buffer[array_end] != '[') {
-                return error.ParserError;
-            }
-
-            array_end += 1;
-
-            for (array_end..buffer.len) |c| {
-                if (buffer[c] == ']') {
-                    array_end = c;
+        if (buffer[0] == '[') {
+            while (buffer.len > 0) {
+                if (buffer[0] != '[') {
                     break;
                 }
-            }
 
-            if (array_end == array_start) {
-                allocator.destroy(child);
-                return error.ParserError;
-            }
+                buffer = buffer[1..];
 
-            if (array_end == array_start + 1) {
-                // Dynamic array
-                var array_type = try allocator.create(AbiType);
-                array_type.* = Self{
-                    .array = child,
-                };
-                child = array_type;
-            } else {
-                // Fixed length array
-                const size = try std.fmt.parseInt(u16, buffer[array_start + 1 .. array_end], 10);
+                var size: usize = 0;
+                if (buffer[0] != ']') {
+                    size = try parseInt(&buffer);
 
-                var array_type = try allocator.create(AbiType);
-                array_type.* = Self{ .fixed_array = .{
-                    .size = size,
-                    .child = child,
-                } };
-                child = array_type;
+                    if (size == 0) {
+                        return error.ParserError;
+                    }
+
+                    if (buffer[0] != ']') {
+                        return error.ParserError;
+                    }
+                }
+
+                buffer = buffer[1..];
+
+                if (size == 0) {
+                    // Dynamic array
+                    var child_ptr = try allocator.create(AbiType);
+                    child_ptr.* = child;
+                    child = Self{
+                        .array = child_ptr,
+                    };
+                } else {
+                    var child_ptr = try allocator.create(AbiType);
+                    child_ptr.* = child;
+                    child = Self{
+                        .fixed_array = .{
+                            .size = @intCast(size),
+                            .child = child_ptr,
+                        },
+                    };
+                }
             }
         }
 
@@ -946,6 +1047,8 @@ test "type parsing" {
         "bytes32[3]",
         "bytes32[3]",
         "function",
+        "((uint256,int256),bool,bool)",
+        "(uint256,int256)[5]",
     };
 
     for (inputs) |input| {
