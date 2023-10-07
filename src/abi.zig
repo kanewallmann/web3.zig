@@ -217,7 +217,7 @@ pub const Abi = struct {
                     }
                 }
             }
-        };
+        } else null;
 
         return entry;
     }
@@ -230,7 +230,7 @@ pub const Abi = struct {
                     break :data entry;
                 }
             }
-        };
+        } else null;
 
         return entry;
     }

@@ -5,7 +5,7 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     // Module
-    const web3_module = b.addModule("web", .{
+    const web3_module = b.addModule("web3", .{
         .source_file = .{
             .path = "src/web3.zig",
         },
