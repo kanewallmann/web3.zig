@@ -485,8 +485,10 @@ pub const JsonRpcProvider = struct {
                 }
             },
             .number => |number| {
-                const len = std.fmt.formatIntBuf(&self.tag_buffer, number, 10, .lower, .{});
-                return web3.String.wrap(self.tag_buffer[0..len]);
+                self.tag_buffer[0] = '0';
+                self.tag_buffer[1] = 'x';
+                const len = std.fmt.formatIntBuf(self.tag_buffer[2..], number, 16, .lower, .{});
+                return web3.String.wrap(self.tag_buffer[0 .. len + 2]);
             },
         }
     }
