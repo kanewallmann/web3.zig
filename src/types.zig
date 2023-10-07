@@ -7,6 +7,8 @@ const parser_allocator = @import("parser_allocator.zig");
 pub const Address = struct {
     const Self = @This();
 
+    pub const zero = fromString("0x0000000000000000000000000000000000000000") catch unreachable;
+
     raw: [20]u8,
 
     /// Creates an Address from a string
@@ -48,6 +50,7 @@ fn comptimePow(comptime a: comptime_int, comptime b: comptime_int) comptime_int 
 pub fn FixedPoint(comptime decimals: comptime_int, comptime T: anytype) type {
     return struct {
         const Self = @This();
+        pub const __is_fixed_point = void{}; // Used to determine at comptime this is a FixedPoint type
         const one: T = std.math.pow(T, 10, decimals);
 
         const Double = @Type(std.builtin.Type{
@@ -76,6 +79,14 @@ pub fn FixedPoint(comptime decimals: comptime_int, comptime T: anytype) type {
         /// Returns an approximation of this value as a floating point value
         pub fn toFloat(self: Self) f64 {
             return @as(f64, @floatFromInt(self.raw)) / @as(f64, @floatFromInt(comptimePow(10, decimals)));
+        }
+
+        pub fn getDecimals() u8 {
+            return decimals;
+        }
+
+        pub fn getBackingType() type {
+            return T;
         }
 
         // Arithmetic
@@ -180,7 +191,7 @@ pub fn FixedPoint(comptime decimals: comptime_int, comptime T: anytype) type {
         pub fn toStringTrunc(self: Self, precision: usize, writer: anytype) !void {
             const integer = @divFloor(self.raw, one);
             const frac = @rem(self.raw, one);
-            var frac_str: [decimals]u8 = undefined;
+            var frac_str: [decimals]u8 = .{0} ** decimals;
             _ = std.fmt.formatIntBuf(&frac_str, frac, 10, .lower, .{});
             try writer.print("{d}.", .{integer});
             _ = try writer.write(frac_str[0..precision]);
@@ -203,6 +214,10 @@ pub const String = struct {
         return Self{
             .raw = raw,
         };
+    }
+
+    pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
+        allocator.free(self.raw);
     }
 
     /// Allocates memory and copies string from supplied buffer
@@ -228,6 +243,116 @@ pub const String = struct {
         return writer.print("{s}", .{self.raw});
     }
 };
+
+/// Represents an abi bytes<M> type
+pub fn Bytes(comptime size: comptime_int) type {
+    if (size == 0 or size > 32) {
+        @compileError("Bytes size must be between 1 and 32");
+    }
+    return struct {
+        const Self = @This();
+        pub const __is_bytes = void{}; // Used to determine at comptime this is a Bytes type
+
+        raw: [size]u8,
+
+        pub fn getSize() comptime_int {
+            return size;
+        }
+
+        /// Wraps existing memory
+        pub inline fn wrap(raw: [size]u8) Self {
+            return Self{
+                .raw = raw,
+            };
+        }
+    };
+}
+
+/// Represents an abi bytes type
+pub const ByteArray = struct {
+    const Self = @This();
+
+    raw: []const u8,
+
+    /// Wraps existing memory
+    pub inline fn wrap(raw: []const u8) Self {
+        return Self{
+            .raw = raw,
+        };
+    }
+
+    pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
+        allocator.free(self.raw);
+    }
+};
+
+/// Represents an abi function type (a 20 byte address followed by a 4 byte selector)
+pub const Function = struct {
+    const Self = @This();
+
+    raw: [24]u8,
+
+    /// Wraps existing memory
+    pub inline fn wrap(raw: [24]u8) Self {
+        return Self{
+            .raw = raw,
+        };
+    }
+
+    /// Creates a Function from given address and selector
+    pub inline fn wrapParts(address: [20]u8, selector: [4]u8) Self {
+        var self: Self = undefined;
+        @memcpy(self.raw[0..20], &address);
+        @memcpy(self.raw[20..24], &selector);
+        return self;
+    }
+
+    /// Creates an Address from a string
+    pub fn fromString(str: []const u8) !Self {
+        std.debug.assert(str.len == 44 or str.len == 46);
+
+        var _str = str;
+
+        if (str.len == 44) {
+            std.debug.assert(std.mem.eql(u8, str[0..2], "0x"));
+            _str = _str[2..];
+        }
+
+        var self: Self = undefined;
+        _ = std.fmt.hexToBytes(self.raw[0..], _str) catch unreachable;
+        return self;
+    }
+
+    /// Writes the address in JSON
+    pub fn toJson(self: *const Self, writer: anytype) !usize {
+        return json.JsonWriter.write(self.raw, writer);
+    }
+
+    /// Format helper
+    pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        return writer.print("0x{}", .{std.fmt.fmtSliceHexLower(self.raw[0..])});
+    }
+};
+
+/// Represents an "indexed" argument for a Solidity event
+pub fn Indexed(comptime T: type) type {
+    return struct {
+        const Self = @This();
+        pub const __is_indexed = void{}; // Used to determine at comptime this is an Indexed type
+
+        raw: T,
+
+        pub inline fn wrap(raw: T) Self {
+            return Self{
+                .raw = raw,
+            };
+        }
+
+        pub fn getType() type {
+            return T;
+        }
+    };
+}
 
 /// Utility type which emits an empty array "[]" to the JsonWriter
 pub const EmptyArray = struct {
@@ -574,7 +699,7 @@ pub const AbiType = union(enum) {
 
 /// Stores data used to submit a transaction to a provider
 pub const TransactionRequest = struct {
-    from: Address,
+    from: ?Address = null,
     to: ?Address = null,
     gas: ?u256 = null,
     gas_price: ?u256 = null,
@@ -883,6 +1008,23 @@ pub const BlockTag = union(enum) {
     tag: enum { earliest, latest, safe, finalized, pending },
 };
 
+/// Contains the optional values available when making a contract call
+pub const CallOptions = struct {
+    from: ?Address = null,
+    value: ?u256 = null,
+    gas: ?u256 = null,
+    block_tag: ?BlockTag = null,
+    tx_type: union(enum) {
+        legacy: struct {
+            gas_price: ?u256 = null,
+        },
+        eip1559: struct {
+            max_priority_fee_per_gas: ?u256 = null,
+            max_fee_per_gas: ?u256 = null,
+        },
+    } = .{ .eip1559 = .{} },
+};
+
 /// Represents a dynamic array of bytes encoded as a hex string
 pub const DataHexString = struct {
     const Self = @This();
@@ -931,10 +1073,10 @@ pub fn FixedDataHexString(comptime size: comptime_int) type {
 
         raw: [size]u8,
 
-        pub fn wrap(raw: []const u8) Self {
-            var self: Self = undefined;
-            @memcpy(&self.raw, raw[0..size]);
-            return self;
+        pub fn wrap(raw: [size]u8) Self {
+            return Self{
+                .raw = raw,
+            };
         }
 
         pub fn fromString(str: []const u8) !Self {

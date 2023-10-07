@@ -7,6 +7,25 @@ const abi_json = @embedFile("erc20.json");
 const addr = web3.Address.fromString("0xf977814e90da44bfa03b6295a0616a897441acec") catch unreachable; // Binance wallet
 const usdt = web3.Address.fromString("0xdac17f958d2ee523a2206206994597c13d831ec7") catch unreachable;
 
+/// Wrapping the contract abstraction in a struct can simplify making calls
+const ERC20 = struct {
+    const Self = @This();
+
+    contract: web3.ContractCaller,
+
+    pub fn init(allocator: std.mem.Allocator, address: web3.Address, provider: web3.Provider) ERC20 {
+        return ERC20{
+            .contract = web3.ContractCaller.init(allocator, address, provider),
+        };
+    }
+
+    pub fn balanceOf(self: Self, address: web3.Address, opts: web3.CallOptions) !u256 {
+        // The compiler will hash the signature and emit the 4 byte selector so it doesn't have to at run time
+        const selector = comptime try web3.abi.computeSelectorFromSig("balanceOf(address)");
+        return self.contract.callSelector(selector, .{address}, u256, opts);
+    }
+};
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.detectLeaks();
@@ -25,14 +44,11 @@ pub fn main() !void {
     var abi = try web3.abi.parseJson(allocator, abi_json);
     defer abi.deinit(allocator);
 
-    // Create a contract utility
-    const contract = web3.Contract.init(allocator, usdt, abi, json_rpc_provider.provider());
+    // Create an erc20 instance
+    const erc20 = ERC20.init(allocator, usdt, json_rpc_provider.provider());
 
-    // Call balanceOf(addr)
-    const return_values = try contract.call("balanceOf", .{addr}, .{ .from = addr });
-    defer allocator.free(return_values.data);
-    // Return values can be retrieved by name `getNamed` or by position `get`
-    const usdt_balance = web3.FixedPoint(8, u256).wrap(try return_values.getNamed(allocator, "balance", u256));
+    // Call balanceOf(address)
+    const usdt_balance = web3.FixedPoint(8, u256).wrap(try erc20.balanceOf(addr, .{}));
 
     // Get ETH balance (null here defaults to "latest")
     const eth_balance_wei = json_rpc_provider.getBalance(addr, null) catch |err| switch (err) {
@@ -51,4 +67,14 @@ pub fn main() !void {
 
     // Print results
     std.debug.print("\n{} has {d:.6} USDT and {:.5} ETH at block {:}\n", .{ addr, usdt_balance, eth_balance, block_number });
+}
+
+test "span" {
+    const allocator = std.testing.allocator;
+
+    const ptr = try allocator.alloc(u8, 10);
+    const c_ptr: [*c]u8 = @ptrCast(ptr);
+
+    const recast = std.mem.span(c_ptr);
+    allocator.free(recast);
 }

@@ -45,22 +45,6 @@ pub const ReturnValues = struct {
 pub const Contract = struct {
     const Self = @This();
 
-    pub const CallOptions = struct {
-        from: web3.Address,
-        value: ?u256 = null,
-        gas: ?u256 = null,
-        block_tag: ?web3.BlockTag = null,
-        tx_type: union(enum) {
-            legacy: struct {
-                gas_price: ?u256 = null,
-            },
-            eip1559: struct {
-                max_priority_fee_per_gas: ?u256 = null,
-                max_fee_per_gas: ?u256 = null,
-            },
-        } = .{ .eip1559 = .{} },
-    };
-
     allocator: std.mem.Allocator,
     abi: web3.abi.Abi,
     address: web3.Address,
@@ -78,7 +62,7 @@ pub const Contract = struct {
 
     /// Calls the supplied method on the contract with the given args.
     /// If multiple methods exist with the same name, the first one in the ABI is used.
-    pub fn call(self: *const Self, method: []const u8, args: anytype, opts: CallOptions) !ReturnValues {
+    pub fn call(self: *const Self, method: []const u8, args: anytype, opts: web3.CallOptions) !ReturnValues {
         const entry = try self.abi.findFirstEntry(method);
 
         if (entry == null) {
@@ -89,7 +73,7 @@ pub const Contract = struct {
     }
 
     /// Finds a method with matching name and args and calls it on the contract
-    pub fn callOverloaded(self: *const Self, method: []const u8, arg_types: []const web3.AbiType, args: anytype, opts: CallOptions) !ReturnValues {
+    pub fn callOverloaded(self: *const Self, method: []const u8, arg_types: []const web3.AbiType, args: anytype, opts: web3.CallOptions) !ReturnValues {
         std.debug.assert(arg_types.len == args.len);
         const entry = try self.abi.findEntry(method, arg_types);
 
@@ -102,39 +86,27 @@ pub const Contract = struct {
 
     /// Calls a method on the contract identified by the supplied ABI entry.
     /// The caller can use `findEntry` or `findFirstEntry` and pass the result to this method to avoid the lookup each time.
-    pub fn callEntry(self: *const Self, entry: *web3.abi.AbiEntry, args: anytype, opts: CallOptions) !ReturnValues {
-        var encoder = web3.abi.CalldataArgEncoder.init(self.allocator);
-        defer encoder.deinit();
-
-        if (entry.inputs) |inputs| {
-            inline for (inputs, args) |*input, arg| {
-                try encoder.append(input.type, arg);
-            }
-        }
-
-        return self.callInternal(entry, opts, encoder);
-    }
-
-    fn callInternal(self: *const Self, entry: *web3.abi.AbiEntry, opts: CallOptions, encoder: web3.abi.CalldataArgEncoder) !ReturnValues {
+    pub fn callEntry(self: *const Self, entry: *web3.abi.AbiEntry, args: anytype, opts: web3.CallOptions) !ReturnValues {
         std.debug.assert(entry.name != null);
         std.debug.assert(entry.type == .function);
 
-        const arg_size = encoder.getEncodedLength();
-
-        var calldata = try self.allocator.alloc(u8, 4 + arg_size);
+        // const selector = try entry.computeSelector();
+        const calldata = try web3.abi.CalldataArgEncoder.encodeWithSelector(self.allocator, entry.name, args);
         defer self.allocator.free(calldata);
 
-        const selector = try entry.computeSelector();
-        @memcpy(calldata[0..4], &selector);
+        return ReturnValues{
+            .abi_entry = entry,
+            .data = try self.callInternal(calldata, opts),
+        };
+    }
 
-        _ = try encoder.encodeBuf(calldata[4..]);
-
-        var result = switch (opts.tx_type) {
+    fn callInternal(self: *const Self, calldata: []const u8, opts: web3.CallOptions) ![]const u8 {
+        return switch (opts.tx_type) {
             .eip1559 => |tx| try self.provider.call(web3.TransactionRequest{
                 .from = opts.from,
                 .to = self.address,
                 .value = opts.value,
-                .data = calldata[0 .. 4 + arg_size],
+                .data = calldata,
                 .gas = opts.gas,
                 .max_fee_per_gas = tx.max_fee_per_gas,
                 .max_priority_fee_per_gas = tx.max_priority_fee_per_gas,
@@ -143,15 +115,64 @@ pub const Contract = struct {
                 .from = opts.from,
                 .to = self.address,
                 .value = opts.value,
-                .data = calldata[0 .. 4 + arg_size],
+                .data = calldata,
                 .gas = opts.gas,
                 .gas_price = tx.gas_price,
             }, opts.block_tag),
         };
+    }
+};
 
-        return ReturnValues{
-            .abi_entry = entry,
-            .data = result,
+pub const ContractCaller = struct {
+    const Self = @This();
+
+    allocator: std.mem.Allocator,
+    address: web3.Address,
+    provider: web3.Provider,
+
+    /// Intializes a new contract
+    pub fn init(allocator: std.mem.Allocator, address: web3.Address, provider: web3.Provider) Self {
+        return Self{
+            .allocator = allocator,
+            .address = address,
+            .provider = provider,
+        };
+    }
+
+    /// Calls the supplied method on the contract with the given args.
+    /// Tries to decode the result into a type T
+    pub fn call(self: *const Self, method: []const u8, args: anytype, comptime T: type, opts: web3.CallOptions) !T {
+        const selector = try web3.abi.computeSelector(method, @TypeOf(args));
+        return self.callSelector(selector, args, T, opts);
+    }
+
+    pub fn callSelector(self: *const Self, selector: [4]u8, args: anytype, comptime T: type, opts: web3.CallOptions) !T {
+        const calldata = try web3.abi.CalldataArgEncoder.encodeWithSelector(self.allocator, selector, args);
+        defer self.allocator.free(calldata);
+        const result = try self.callInternal(calldata, opts);
+        defer self.allocator.free(result);
+        return web3.abi.decodeArg(self.allocator, result, 0, T);
+    }
+
+    fn callInternal(self: *const Self, calldata: []const u8, opts: web3.CallOptions) ![]const u8 {
+        return switch (opts.tx_type) {
+            .eip1559 => |tx| try self.provider.call(web3.TransactionRequest{
+                .from = opts.from,
+                .to = self.address,
+                .value = opts.value,
+                .data = calldata,
+                .gas = opts.gas,
+                .max_fee_per_gas = tx.max_fee_per_gas,
+                .max_priority_fee_per_gas = tx.max_priority_fee_per_gas,
+            }, opts.block_tag),
+            .legacy => |tx| try self.provider.call(web3.TransactionRequest{
+                .from = opts.from,
+                .to = self.address,
+                .value = opts.value,
+                .data = calldata,
+                .gas = opts.gas,
+                .gas_price = tx.gas_price,
+            }, opts.block_tag),
         };
     }
 };

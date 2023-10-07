@@ -22,12 +22,12 @@ pub fn formatEther(value: u256, writer: anytype) !void {
 pub fn keccak256(input: []const u8) web3.Hash {
     var output: [32]u8 = undefined;
     std.crypto.hash.sha3.Keccak256.hash(input, output[0..], .{});
-    return web3.Hash.wrap(&output);
+    return web3.Hash.wrap(output);
 }
 
 /// Returns the sha256 digest of the supplied bytes
 pub fn sha256(input: []const u8) web3.Hash {
     var output: [32]u8 = undefined;
     std.crypto.hash.sha2.Sha256.hash(input, output[0..], .{});
-    return web3.Hash.wrap(&output);
+    return web3.Hash.wrap(output);
 }

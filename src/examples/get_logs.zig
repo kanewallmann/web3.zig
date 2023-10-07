@@ -4,7 +4,14 @@ const web3 = @import("web3");
 
 const reth = web3.Address.fromString("0xae78736Cd615f374D3085123A210448E74Fc6393") catch unreachable;
 
-const reth_abi_json = @embedFile("reth.json");
+const rETH = struct {
+    pub const events = struct {
+        pub const TokensBurned = struct {
+            pub const topic = web3.Hash.wrap(web3.abi.computeTopicFromSig("TokensBurned(address,uint256,uint256,uint256)") catch unreachable);
+            pub const returnType = struct { address: web3.Indexed(web3.Address), reth: web3.Ether, eth: web3.Ether };
+        };
+    };
+};
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -26,31 +33,20 @@ pub fn main() !void {
         .number = block - 10000,
     };
 
-    // Parse the ABI file
-    var abi = try web3.abi.parseJson(allocator, reth_abi_json);
-    defer abi.deinit(allocator);
-
-    // Find the desired event
-    const event_entry = try abi.findFirstEntry("TokensBurned");
-    if (event_entry == null) @panic("ABI missing required entry");
-
-    // Create a topic filter
-    const ether_deposited_topic = try event_entry.?.computeTopic();
+    // // Create a topic filter
     const topics = [_]web3.Hash{
-        ether_deposited_topic,
+        rETH.events.TokensBurned.topic,
     };
 
     // Get the logs
     var logs = try json_rpc_provider.getLogs(from_block, null, reth, topics[0..]);
     defer logs.deinit(allocator);
 
-    // Manually decode and display results
+    // Decode and display results
     for (logs.raw) |log| {
-        const from = try web3.abi.decodeArg(allocator, &log.topics[1].raw, 0, web3.AbiType.address, web3.Address);
-        const amount_reth = web3.Ether.wrap(try web3.abi.decodeArg(allocator, log.data.raw, 0, web3.AbiType.uint256, u256));
-        const amount_eth = web3.Ether.wrap(try web3.abi.decodeArg(allocator, log.data.raw, 32, web3.AbiType.uint256, u256));
+        const decoded_log = try web3.abi.decodeLog(allocator, log, rETH.events.TokensBurned.returnType);
 
         // FixedPoint (and Ether) types support the precision option when formating values
-        std.debug.print("{} burned {d:.6} rETH for {d:.6} ETH\n", .{ from, amount_reth, amount_eth });
+        std.debug.print("{} burned {d:.6} rETH for {d:.6} ETH\n", .{ decoded_log.address, decoded_log.reth, decoded_log.eth });
     }
 }
