@@ -66,7 +66,6 @@ pub const SigningKey = struct {
 
         var counter: usize = 0;
         while (true) : (counter += 1) {
-            // Calculate secret value k from [1,n-1]
             var k_bytes = self.generateNonce(message, counter);
             var k = try curve.scalar.Scalar.fromBytes(k_bytes, .Big);
 
