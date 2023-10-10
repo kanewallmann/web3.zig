@@ -1,9 +1,8 @@
 const std = @import("std");
 
+const web3 = @import("web3.zig");
+
 /// Encodes data into JSON
-/// Not designed for general-purpose JSON encoding as it is optimized for communication
-/// with Ethereum JSON RPC which has some specific requirements such as numbers being
-/// encoded as hex strings
 pub const JsonWriter = struct {
     pub fn writeLiteral(arg: []const u8, writer: anytype) !usize {
         return writer.write(arg);
@@ -14,6 +13,29 @@ pub const JsonWriter = struct {
         _ = try writer.write(arg);
         try writer.writeByte('"');
         return arg.len + 2;
+    }
+
+    pub fn writeHexString(arg: []const u8, writer: anytype) !usize {
+        const charset = "0123456789abcdef";
+        _ = try writer.write("\"0x");
+        for (arg) |b| {
+            try writer.writeByte(charset[b >> 4]);
+            try writer.writeByte(charset[b & 15]);
+        }
+        try writer.writeByte('"');
+        return 4 + arg.len / 2;
+    }
+
+    pub fn writeHexInt(arg: anytype, writer: anytype) !usize {
+        var buffer: [78]u8 = undefined;
+        var fbs = std.io.fixedBufferStream(&buffer);
+        try std.fmt.formatInt(arg, 16, .lower, .{}, fbs.writer());
+
+        _ = try writer.write("\"0x");
+        _ = try writer.write(buffer[0..fbs.pos]);
+        try writer.writeByte('"');
+
+        return fbs.pos + 4;
     }
 
     pub fn write(arg: anytype, writer: anytype) !usize {
@@ -28,16 +50,13 @@ pub const JsonWriter = struct {
 
         switch (TI) {
             .Int, .ComptimeInt => {
-                // Ints are written as a hex encoded string
-                var buffer: [64 + 4]u8 = undefined;
+                var buffer: [78]u8 = undefined;
                 var fbs = std.io.fixedBufferStream(&buffer);
-                _ = try fbs.write("\"0x");
-                try std.fmt.formatInt(arg, 16, .lower, .{}, fbs.writer());
-                _ = try fbs.write("\"");
+                try std.fmt.formatInt(arg, 10, .lower, .{}, fbs.writer());
                 return writer.write(buffer[0..fbs.pos]);
             },
             .Float, .ComptimeFloat => {
-                var buffer: [32]u8 = undefined;
+                var buffer: [78]u8 = undefined;
                 var fbs = std.io.fixedBufferStream(&buffer);
                 try std.fmt.formatFloatDecimal(arg, .{}, fbs.writer());
                 return writer.write(buffer[0..fbs.pos]);
@@ -120,32 +139,32 @@ pub const JsonWriter = struct {
                         return write(arg.*, writer);
                     },
                     .Slice => {
-                        if (ptr.child == u8) {
-                            const charset = "0123456789abcdef";
-                            _ = try writer.write("\"0x");
-                            for (arg) |b| {
-                                try writer.writeByte(charset[b >> 4]);
-                                try writer.writeByte(charset[b & 15]);
+                        // if (ptr.child == u8) {
+                        //     const charset = "0123456789abcdef";
+                        //     _ = try writer.write("\"0x");
+                        //     for (arg) |b| {
+                        //         try writer.writeByte(charset[b >> 4]);
+                        //         try writer.writeByte(charset[b & 15]);
+                        //     }
+                        //     try writer.writeByte('"');
+                        //     return 4 + arg.len / 2;
+                        // } else {
+                        const len = arg.len;
+                        try writer.writeByte('[');
+
+                        var total_size: usize = 2;
+
+                        for (0..len) |i| {
+                            total_size += try write(arg[i], writer);
+                            if (i != len - 1) {
+                                try writer.writeByte(',');
+                                total_size += 1;
                             }
-                            try writer.writeByte('"');
-                            return 4 + arg.len / 2;
-                        } else {
-                            const len = arg.len;
-                            try writer.writeByte('[');
-
-                            var total_size: usize = 2;
-
-                            for (0..len) |i| {
-                                total_size += try write(arg[i], writer);
-                                if (i != len - 1) {
-                                    try writer.writeByte(',');
-                                    total_size += 1;
-                                }
-                            }
-
-                            try writer.writeByte(']');
-                            return total_size;
                         }
+
+                        try writer.writeByte(']');
+                        return total_size;
+                        // }
                     },
                     .Many, .C => {
                         if (ptr.sentinel == null) {
@@ -265,6 +284,54 @@ pub const JsonReader = struct {
         }
     }
 
+    fn parseFloat(buffer: *[]const u8, comptime T: type) !T {
+        var _buffer = buffer.ptr;
+        defer {
+            buffer.len = buffer.len - (@intFromPtr(_buffer) - @intFromPtr(buffer.ptr));
+            buffer.ptr = _buffer;
+        }
+
+        const end = _buffer + buffer.len;
+
+        var state: enum { start, int, frac } = .start;
+
+        while (_buffer != end) : (_buffer += 1) {
+            switch (state) {
+                .start => {
+                    switch (_buffer[0]) {
+                        '0'...'9', '-' => {
+                            state = .int;
+                        },
+                        else => return error.UnexpectedCharacter,
+                    }
+                },
+                .int => {
+                    switch (_buffer[0]) {
+                        '.' => {
+                            state = .frac;
+                        },
+                        '0'...'9' => {},
+                        else => {
+                            break;
+                        },
+                    }
+                },
+                .frac => {
+                    switch (_buffer[0]) {
+                        '0'...'9' => {},
+                        else => {
+                            break;
+                        },
+                    }
+                },
+            }
+        }
+
+        var size: usize = @intFromPtr(_buffer) - @intFromPtr(buffer.ptr);
+        var slice = buffer.*[0..size];
+        return try std.fmt.parseFloat(T, slice);
+    }
+
     fn parseString(buffer: *[]const u8) ![]const u8 {
         var _buffer = buffer.*;
         defer {
@@ -367,6 +434,7 @@ pub const JsonReader = struct {
                     @field(result, field.name) = default_value;
                 } else {
                     if (FTI != .Optional) {
+                        std.debug.print("Missing {s}\n", .{field.name});
                         return error.MissingRequiredField;
                     } else {
                         @field(result, field.name) = null;
@@ -671,6 +739,9 @@ pub const JsonReader = struct {
             .Int => {
                 return parseInt(buffer, T);
             },
+            .Float => {
+                return parseFloat(buffer, T);
+            },
             .Bool => {
                 if (buffer.len >= "true".len and std.mem.eql(u8, buffer.*[0.."true".len], "true")) {
                     buffer.* = buffer.*["true".len..];
@@ -754,17 +825,38 @@ pub const JsonReader = struct {
     }
 };
 
+pub const JsonDef = struct {
+    field_name: []const u8,
+};
+
+fn getJsonDef(comptime T: type, comptime field_name: []const u8) JsonDef {
+    const TI = @typeInfo(T);
+
+    std.debug.assert(TI == .Struct);
+
+    if (@hasDecl(T, "json_def")) {
+        const json_defs = T.json_def;
+        if (@hasField(@TypeOf(json_defs), field_name)) {
+            return @field(T.json_def, field_name);
+        }
+    }
+
+    return JsonDef{
+        .field_name = field_name,
+    };
+}
+
 test "writing" {
     const assert = std.debug.assert;
 
     // Struct
     {
         const val: struct {
-            hello: u32,
-            world: u32,
+            hello: web3.IntHexString(u32),
+            world: web3.IntHexString(u32),
         } = .{
-            .hello = 0x20,
-            .world = 0x40,
+            .hello = web3.IntHexString(u32).wrap(0x20),
+            .world = web3.IntHexString(u32).wrap(0x40),
         };
 
         var buf: [32]u8 = undefined;
@@ -850,29 +942,7 @@ test "reading" {
     }
 }
 
-pub const JsonDef = struct {
-    field_name: []const u8,
-};
-
-fn getJsonDef(comptime T: type, comptime field_name: []const u8) JsonDef {
-    const TI = @typeInfo(T);
-
-    std.debug.assert(TI == .Struct);
-
-    if (@hasDecl(T, "json_def")) {
-        const json_defs = T.json_def;
-        if (@hasField(@TypeOf(json_defs), field_name)) {
-            return @field(T.json_def, field_name);
-        }
-    }
-
-    return JsonDef{
-        .field_name = field_name,
-    };
-}
-
 test "json def" {
-    const web3 = @import("web3.zig");
     const json_def = getJsonDef(web3.abi.AbiEntry, "state_mutability");
     std.debug.assert(std.mem.eql(u8, json_def.field_name, "stateMutability"));
 }

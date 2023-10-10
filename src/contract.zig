@@ -41,7 +41,7 @@ pub const ReturnValues = struct {
     }
 };
 
-/// Abstraction around Ethereum contracts (incomplete)
+/// Abstraction around Ethereum contracts (currently being refactored)
 pub const Contract = struct {
     const Self = @This();
 
@@ -160,7 +160,7 @@ pub const ContractCaller = struct {
                 .from = opts.from,
                 .to = self.address,
                 .value = opts.value,
-                .data = calldata,
+                .data = web3.DataHexString.wrap(calldata),
                 .gas = opts.gas,
                 .max_fee_per_gas = tx.max_fee_per_gas,
                 .max_priority_fee_per_gas = tx.max_priority_fee_per_gas,
@@ -169,7 +169,7 @@ pub const ContractCaller = struct {
                 .from = opts.from,
                 .to = self.address,
                 .value = opts.value,
-                .data = calldata,
+                .data = web3.DataHexString.wrap(calldata),
                 .gas = opts.gas,
                 .gas_price = tx.gas_price,
             }, opts.block_tag),
@@ -181,15 +181,40 @@ pub const ContractCaller = struct {
 pub const Provider = struct {
     const Self = @This();
 
-    // The type erased pointer to the allocator implementation
+    // The type erased pointer to the implementation
     ptr: *anyopaque,
     vtable: *const VTable,
 
     pub const VTable = struct {
         call: *const fn (ctx: *anyopaque, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) anyerror![]const u8,
+        estimateGas: *const fn (ctx: *anyopaque, tx: web3.TransactionRequest) anyerror!u256,
+        send: *const fn (ctx: *anyopaque, tx: web3.TransactionRequest) anyerror!web3.Hash,
+        sendRaw: *const fn (ctx: *anyopaque, raw_tx: []const u8) anyerror!web3.Hash,
+        getTransactionCount: *const fn (ctx: *anyopaque, address: web3.Address, block_tag: ?web3.BlockTag) anyerror!u256,
+        getFeeEstimate: *const fn (ctx: *anyopaque, speed: web3.FeeEstimateSpeed) anyerror!web3.FeeEstimate,
     };
 
     pub inline fn call(self: Self, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]const u8 {
         return self.vtable.call(self.ptr, tx, block_tag);
+    }
+
+    pub inline fn estimateGas(self: Self, tx: web3.TransactionRequest) !u256 {
+        return self.vtable.estimateGas(self.ptr, tx);
+    }
+
+    pub inline fn send(self: Self, tx: web3.TransactionRequest) !web3.Hash {
+        return self.vtable.send(self.ptr, tx);
+    }
+
+    pub inline fn sendRaw(self: Self, raw_tx: []const u8) !web3.Hash {
+        return self.vtable.sendRaw(self.ptr, raw_tx);
+    }
+
+    pub inline fn getTransactionCount(self: Self, address: web3.Address, block_tag: ?web3.BlockTag) !u256 {
+        return self.vtable.getTransactionCount(self.ptr, address, block_tag);
+    }
+
+    pub inline fn getFeeEstimate(self: Self, speed: web3.FeeEstimateSpeed) !web3.FeeEstimate {
+        return self.vtable.getFeeEstimate(self.ptr, speed);
     }
 };

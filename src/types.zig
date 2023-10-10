@@ -1,7 +1,9 @@
 const std = @import("std");
-const json = @import("json.zig");
-const util = @import("util.zig");
+
 const parser_allocator = @import("parser_allocator.zig");
+
+const web3 = @import("web3.zig");
+const json = web3.json;
 
 /// Represents an Ethereum address of 20 bytes
 pub const Address = struct {
@@ -10,6 +12,28 @@ pub const Address = struct {
     pub const zero = fromString("0x0000000000000000000000000000000000000000") catch unreachable;
 
     raw: [20]u8,
+
+    pub inline fn wrap(raw: [20]u8) Self {
+        return Self{
+            .raw = raw,
+        };
+    }
+
+    /// Calculates an Ethereum address from the given uncompressed SEC1 encoded public key
+    pub fn fromUncompressedSec1(pubkey_bytes: [65]u8) !Self {
+        // Hash the pubkey
+        var out: [32]u8 = undefined;
+        std.crypto.hash.sha3.Keccak256.hash(pubkey_bytes[1..65], &out, .{});
+
+        // Return as address
+        return wrap(out[12..32].*);
+    }
+
+    /// Calculates an Ethereum address from the given SEC1 encoded public key
+    pub fn fromSec1(sec1: []u8) !Self {
+        const point = try std.crypto.ecc.Secp256k1.fromSec1(sec1);
+        return fromUncompressedSec1(point.toUncompressedSec1());
+    }
 
     /// Creates an Address from a string
     pub fn fromString(str: []const u8) !Self {
@@ -29,7 +53,7 @@ pub const Address = struct {
 
     /// Writes the address in JSON
     pub fn toJson(self: *const Self, writer: anytype) !usize {
-        return json.JsonWriter.write(self.raw, writer);
+        return json.JsonWriter.writeHexString(&self.raw, writer);
     }
 
     /// Format helper
@@ -697,18 +721,28 @@ pub const AbiType = union(enum) {
     }
 };
 
-/// Stores data used to submit a transaction to a provider
+/// Represents an unmined Ethereum transaction
 pub const TransactionRequest = struct {
+    const Self = @This();
+
+    chain_id: ?u256 = null,
     from: ?Address = null,
     to: ?Address = null,
     gas: ?u256 = null,
     gas_price: ?u256 = null,
     max_priority_fee_per_gas: ?u256 = null,
     max_fee_per_gas: ?u256 = null,
+    nonce: ?u256 = null,
     value: ?u256 = null,
-    data: ?[]const u8 = null,
+    data: ?DataHexString = null,
+    v: ?u256 = null,
+    r: ?u256 = null,
+    s: ?u256 = null,
 
     pub const json_def = .{
+        .chain_id = json.JsonDef{
+            .field_name = "chainId",
+        },
         .gas_price = json.JsonDef{
             .field_name = "gasPrice",
         },
@@ -720,29 +754,101 @@ pub const TransactionRequest = struct {
         },
     };
 
+    /// Determines the transaction type by the existence of `max_priority_fee_per_gas`
+    pub fn getType(self: TransactionRequest) u32 {
+        if (self.max_priority_fee_per_gas != null) {
+            return 2;
+        } else {
+            return 0;
+        }
+    }
+
     /// Deallocates owned memory
     pub fn deinit(self: TransactionRequest, allocator: std.mem.Allocator) void {
         if (self.data) |data| {
-            allocator.free(data);
+            allocator.free(data.raw);
         }
+    }
+
+    /// Adds the given signature to this TransactionRequest making it a signed transaction request
+    pub fn addSignature(self: *TransactionRequest, signature: web3.ecdsa.Signature) void {
+        self.v = signature.v;
+        self.r = signature.r;
+        self.s = signature.s;
+    }
+
+    /// Encodes in the format expected by eth_signTransaction. The result is either a "LegacyTransaction"
+    /// or an EIP-2718 "Typed Transaction" depending on the inferred transaction type.
+    pub fn encode(self: Self, allocator: std.mem.Allocator) ![]u8 {
+        var buffer = try std.ArrayList(u8).initCapacity(allocator, 1024);
+        defer buffer.deinit();
+
+        var writer = buffer.writer();
+
+        switch (self.getType()) {
+            0 => {
+                // "LegacyTransaction"
+                if (self.nonce == null or self.gas_price == null or self.value == null or self.gas == null) {
+                    return error.MissingFields;
+                }
+
+                try web3.rlp.RlpEncoder.write(.{
+                    self.nonce.?,
+                    self.gas_price.?,
+                    self.gas.?,
+                    if (self.to == null) web3.Address.zero.raw else self.to.?.raw,
+                    if (self.value == null) 0 else self.value.?,
+                    if (self.data == null) &.{} else self.data.?.raw,
+                    if (self.v != null) self.v else if (self.chain_id != null) self.chain_id else 0,
+                    if (self.r == null) 0 else self.r,
+                    if (self.s == null) 0 else self.s,
+                }, writer);
+            },
+            2 => {
+                // EIP-1559 Transaction
+                if (self.chain_id == null or self.nonce == null or self.max_priority_fee_per_gas == null or self.max_fee_per_gas == null or self.gas == null) {
+                    return error.MissingFields;
+                }
+
+                try writer.writeByte(2);
+                try web3.rlp.RlpEncoder.write(.{
+                    self.chain_id.?,
+                    self.nonce.?,
+                    self.max_priority_fee_per_gas.?,
+                    self.max_fee_per_gas.?,
+                    self.gas.?,
+                    if (self.to == null) web3.Address.zero.raw else self.to.?.raw,
+                    if (self.value == null) 0 else self.value.?,
+                    if (self.data == null) &.{} else self.data.?.raw,
+                    if (self.v != null) self.v else if (self.chain_id != null) self.chain_id else 0,
+                    if (self.r == null) 0 else self.r,
+                    if (self.s == null) 0 else self.s,
+                }, writer);
+            },
+            else => return error.UnknownTransactionType,
+        }
+
+        return buffer.toOwnedSlice();
     }
 };
 
 /// Represents a pending or mined transaction on Ethereum
 pub const Transaction = struct {
-    block_hash: ?Hash,
-    block_number: ?u64,
+    block_hash: ?Hash = null,
+    block_number: ?u64 = null,
     from: Address,
     gas: u256,
     gas_price: ?u256 = null,
     max_priority_fee_per_gas: ?u256 = null,
     max_fee_per_gas: ?u256 = null,
-    hash: Hash,
+    nonce: u64,
+    hash: ?Hash = null,
     input: []const u8,
-    to: Address,
-    transaction_index: u32,
+    to: ?Address = null,
+    transaction_index: ?u32 = null,
+    type: u8,
     value: u256,
-    v: u8,
+    v: u256,
     r: u256,
     s: u256,
 
@@ -1031,6 +1137,12 @@ pub const DataHexString = struct {
 
     raw: []const u8,
 
+    pub fn wrap(raw: []const u8) Self {
+        return Self{
+            .raw = raw,
+        };
+    }
+
     /// Frees the wrapped memory
     pub inline fn deinit(self: Self, allocator: std.mem.Allocator) void {
         allocator.free(self.raw);
@@ -1057,7 +1169,7 @@ pub const DataHexString = struct {
 
     /// Writes the wrapped byte array to JSON
     pub fn toJson(self: *const Self, writer: anytype) !usize {
-        return json.JsonWriter.write(self.raw, writer);
+        return json.JsonWriter.writeHexString(self.raw, writer);
     }
 
     /// Format helper
@@ -1096,7 +1208,7 @@ pub fn FixedDataHexString(comptime size: comptime_int) type {
         }
 
         pub fn toJson(self: *const Self, writer: anytype) !usize {
-            return json.JsonWriter.write(&self.raw, writer);
+            return json.JsonWriter.writeHexString(&self.raw, writer);
         }
 
         pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
@@ -1138,7 +1250,7 @@ pub fn IntHexString(comptime T: type) type {
         }
 
         pub fn toJson(self: *const Self, writer: anytype) !usize {
-            return json.JsonWriter.write(self.raw, writer);
+            return json.JsonWriter.writeHexInt(self.raw, writer);
         }
 
         pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
@@ -1146,6 +1258,15 @@ pub fn IntHexString(comptime T: type) type {
         }
     };
 }
+
+/// Used as a hint to provider for fee estimation
+pub const FeeEstimateSpeed = enum { low, average, high };
+
+/// An estimate of fees for an eip-1559 transaction
+pub const FeeEstimate = struct {
+    max_fee_per_gas: u256,
+    max_priority_fee_per_gas: u256,
+};
 
 test "fixed point" {
     const assert = std.debug.assert;
@@ -1206,5 +1327,46 @@ test "type parsing" {
         try writer.print("{}", .{typ});
 
         assert(std.mem.eql(u8, output, input));
+    }
+}
+
+test "transaction" {
+    const allocator = std.testing.allocator;
+    const assert = std.debug.assert;
+    var hex: [1024]u8 = undefined;
+
+    // EIP-1557 (Type 2)
+    {
+        const tx_req = TransactionRequest{
+            .chain_id = 1,
+            .nonce = 123,
+            .max_priority_fee_per_gas = 100,
+            .max_fee_per_gas = 500,
+            .gas = 10000000,
+            .value = 0,
+            .data = DataHexString.wrap(&.{}),
+        };
+        const tx = try tx_req.encode(allocator);
+        defer allocator.free(tx);
+
+        const bytes = try std.fmt.hexToBytes(&hex, "02e4017b648201f4839896809400000000000000000000000000000000000000008080018080");
+        assert(std.mem.eql(u8, bytes, tx));
+    }
+
+    // Legacy
+    {
+        const tx_req = TransactionRequest{
+            .chain_id = 1,
+            .nonce = 123,
+            .gas_price = 100,
+            .gas = 10000000,
+            .value = 500000000,
+            .data = DataHexString.wrap(&.{}),
+        };
+        const tx = try tx_req.encode(allocator);
+        defer allocator.free(tx);
+
+        const bytes = try std.fmt.hexToBytes(&hex, "e47b6483989680940000000000000000000000000000000000000000841dcd650080018080");
+        assert(std.mem.eql(u8, bytes, tx));
     }
 }

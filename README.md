@@ -1,4 +1,4 @@
-# zig-web3
+# web3.zig
 
 A collection of utilities for interacting with a local or remote ethereum node. Similar to the javascript
 frameworks [web3.js](https://web3js.readthedocs.io/en/v1.10.0/) or [ethers.js](https://docs.ethers.org/v5/).
@@ -86,9 +86,9 @@ This is a list of what has been implemented and what is planned.
 - ✅ JSON RPC communication
 - ✅ ABI encoding/decoding
 - ✅ ABI parsing (JSON)
-- ✅ Abstracted contract interaction
+- ✅ Abstracted contract interaction (partially implemented)
 - ❌ Async support (not available in Zig 0.11.0 anyway)
-- ❌ Local account features (signing transactions, HD wallet generation, etc.)
+- ✅ Local account features (signing transactions, HD wallets, etc.)
 - ❌ Log and transaction filters
 - ❌ Abstracted contract deployment
 - ❌ RLP encoding/decoding (and by extension transaction encoding/decoding)

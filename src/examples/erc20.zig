@@ -68,13 +68,3 @@ pub fn main() !void {
     // Print results
     std.debug.print("\n{} has {d:.6} USDT and {:.5} ETH at block {:}\n", .{ addr, usdt_balance, eth_balance, block_number });
 }
-
-test "span" {
-    const allocator = std.testing.allocator;
-
-    const ptr = try allocator.alloc(u8, 10);
-    const c_ptr: [*c]u8 = @ptrCast(ptr);
-
-    const recast = std.mem.span(c_ptr);
-    allocator.free(recast);
-}

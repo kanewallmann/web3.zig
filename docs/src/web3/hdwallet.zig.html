@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">    <title>hdwallet.zig - source view</title>
+    <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAPNJREFUeNpi/P//PwMlgOXHUjly9E0G4hwgZmQiQZMqEK8H4v9QzUEgQSaoADK+zhH9iAGL+C0gDoAaNg9mGLoLfgA1awK9hS9gzgJxA9RQBmQDrgMxJzRMGKE4HYj/Ial5A8QmQLwCJoBsgBYW2+TR1ChDaWt4LOBxKsi/VUh8XiD+gq4IVyzwQAMJBoKwacZlAB8Qf0bi96IZhtOAe1D6LpqaEiz6rmEzQAeIzwGxCJpieFqApo/vQKyJboAaEBsAsSEupwI1MwKjGBTVHOhegMX5UajYRqiBjMgYmj400cVh0XgTiKdC0zhJgJHS7AwQYABm9EAdCKrEfAAAAABJRU5ErkJggg=="/>
+    <style>
+      body{
+        font-family: system-ui, -apple-system, Roboto, "Segoe UI", sans-serif;
+        margin: 0;
+        line-height: 1.5;
+      }
+
+      pre > code {
+        display: block;
+        overflow: auto;
+        line-height: normal;
+        margin: 0em;
+      }
+      .tok-kw {
+          color: #333;
+          font-weight: bold;
+      }
+      .tok-str {
+          color: #d14;
+      }
+      .tok-builtin {
+          color: #005C7A;
+      }
+      .tok-comment {
+          color: #545454;
+          font-style: italic;
+      }
+      .tok-fn {
+          color: #900;
+          font-weight: bold;
+      }
+      .tok-null {
+          color: #005C5C;
+      }
+      .tok-number {
+          color: #005C5C;
+      }
+      .tok-type {
+          color: #458;
+          font-weight: bold;
+      }
+      pre {
+        counter-reset: line;
+      }
+      pre .line:before {
+        counter-increment: line;
+        content: counter(line);
+        display: inline-block;
+        padding-right: 1em;
+        width: 2em;
+        text-align: right;
+        color: #999;
+      }
+      
+      .line {
+        width: 100%;
+        display: inline-block;
+      }
+      .line:target {
+        border-top: 1px solid #ccc;
+        border-bottom: 1px solid #ccc;
+        background: #fafafa;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body{
+            background:#222;
+            color: #ccc;
+        }
+        pre > code {
+            color: #ccc;
+            background: #222;
+            border: unset;
+        }
+        .line:target {
+            border-top: 1px solid #444;
+            border-bottom: 1px solid #444;
+            background: #333;
+        }
+        .tok-kw {
+            color: #eee;
+        }
+        .tok-str {
+            color: #2e5;
+        }
+        .tok-builtin {
+            color: #ff894c;
+        }
+        .tok-comment {
+            color: #aa7;
+        }
+        .tok-fn {
+            color: #B1A0F8;
+        }
+        .tok-null {
+            color: #ff8080;
+        }
+        .tok-number {
+            color: #ff8080;
+        }
+        .tok-type {
+            color: #68f;
+        }
+      }
+    </style>
+</head>
+<body>
+<pre><code><span class="line" id="L1"><span class="tok-comment">//! Implements the bip-32 standard for &quot;HD Wallets&quot;</span></span>
+<span class="line" id="L2"><span class="tok-comment">//! Reference: https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki</span></span>
+<span class="line" id="L3"></span>
+<span class="line" id="L4"><span class="tok-kw">const</span> std = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;std&quot;</span>);</span>
+<span class="line" id="L5"><span class="tok-kw">const</span> curve = std.crypto.ecc.Secp256k1;</span>
+<span class="line" id="L6"></span>
+<span class="line" id="L7"><span class="tok-kw">const</span> web3 = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;web3.zig&quot;</span>);</span>
+<span class="line" id="L8"></span>
+<span class="line" id="L9"><span class="tok-kw">const</span> secret_key = <span class="tok-str">&quot;Bitcoin seed&quot;</span>;</span>
+<span class="line" id="L10"></span>
+<span class="line" id="L11"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> Node = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L12">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L13"></span>
+<span class="line" id="L14">    key: [<span class="tok-number">32</span>]<span class="tok-type">u8</span>,</span>
+<span class="line" id="L15">    chain_code: [<span class="tok-number">32</span>]<span class="tok-type">u8</span>,</span>
+<span class="line" id="L16">    recovery: <span class="tok-type">u8</span>, <span class="tok-comment">// Used on neutered nodes as the 1st byte of the public key in SEC1 compressed form</span>
+</span>
+<span class="line" id="L17"></span>
+<span class="line" id="L18">    <span class="tok-comment">/// Returns true if the node has been &quot;neutered&quot; i.e. private key has been discarded</span></span>
+<span class="line" id="L19">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">isNeutered</span>(self: Self) <span class="tok-type">bool</span> {</span>
+<span class="line" id="L20">        <span class="tok-kw">return</span> self.recovery != <span class="tok-number">0</span>;</span>
+<span class="line" id="L21">    }</span>
+<span class="line" id="L22"></span>
+<span class="line" id="L23">    <span class="tok-comment">/// Constructs a master node from the given seed (typically a 256 byte output of mnemonic.seedFromMnemonic)</span></span>
+<span class="line" id="L24">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">fromSeed</span>(seed: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) Self {</span>
+<span class="line" id="L25">        <span class="tok-comment">// Calculate I = HMAC-SHA512(&quot;Bitcoin seed&quot;, S)</span>
+</span>
+<span class="line" id="L26">        <span class="tok-kw">const</span> hmac = std.crypto.auth.hmac.sha2.HmacSha512;</span>
+<span class="line" id="L27">        <span class="tok-kw">var</span> out: [<span class="tok-number">64</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L28">        hmac.create(&amp;out, seed, secret_key);</span>
+<span class="line" id="L29"></span>
+<span class="line" id="L30">        <span class="tok-comment">// Split I into two 32-byte sequences, IL and IR.</span>
+</span>
+<span class="line" id="L31">        <span class="tok-kw">return</span> Self{</span>
+<span class="line" id="L32">            .recovery = <span class="tok-number">0</span>,</span>
+<span class="line" id="L33">            .key = out[<span class="tok-number">0</span>..<span class="tok-number">32</span>].*,</span>
+<span class="line" id="L34">            .chain_code = out[<span class="tok-number">32</span>..<span class="tok-number">64</span>].*,</span>
+<span class="line" id="L35">        };</span>
+<span class="line" id="L36">    }</span>
+<span class="line" id="L37"></span>
+<span class="line" id="L38">    <span class="tok-comment">/// Returns a node from the given seed and derivation path e.g. m/44'/60'/0'/0</span></span>
+<span class="line" id="L39">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">fromSeedAndPath</span>(seed: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, path: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !Self {</span>
+<span class="line" id="L40">        <span class="tok-kw">if</span> (path[<span class="tok-number">0</span>] != <span class="tok-str">'m'</span>) {</span>
+<span class="line" id="L41">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidPath;</span>
+<span class="line" id="L42">        }</span>
+<span class="line" id="L43"></span>
+<span class="line" id="L44">        <span class="tok-kw">const</span> master_node = fromSeed(seed);</span>
+<span class="line" id="L45">        <span class="tok-kw">return</span> master_node.derivePath(path[<span class="tok-number">1</span>..]);</span>
+<span class="line" id="L46">    }</span>
+<span class="line" id="L47"></span>
+<span class="line" id="L48">    <span class="tok-comment">/// Gets the private key for this node. Errors if the node is &quot;neutered&quot;.</span></span>
+<span class="line" id="L49">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getPrivateKey</span>(self: Self) ![<span class="tok-number">32</span>]<span class="tok-type">u8</span> {</span>
+<span class="line" id="L50">        <span class="tok-kw">if</span> (self.recovery == <span class="tok-number">0</span>) {</span>
+<span class="line" id="L51">            <span class="tok-kw">return</span> self.key;</span>
+<span class="line" id="L52">        } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L53">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.PrivateKeyNotAvailable;</span>
+<span class="line" id="L54">        }</span>
+<span class="line" id="L55">    }</span>
+<span class="line" id="L56"></span>
+<span class="line" id="L57">    <span class="tok-comment">/// Gets the public key for this node</span></span>
+<span class="line" id="L58">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getPublicKey</span>(self: Self) ![<span class="tok-number">33</span>]<span class="tok-type">u8</span> {</span>
+<span class="line" id="L59">        <span class="tok-kw">if</span> (self.recovery == <span class="tok-number">0</span>) {</span>
+<span class="line" id="L60">            <span class="tok-kw">const</span> pubkey = <span class="tok-kw">try</span> curve.mul(curve.basePoint, self.key, .Big);</span>
+<span class="line" id="L61">            <span class="tok-kw">return</span> pubkey.toCompressedSec1();</span>
+<span class="line" id="L62">        } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L63">            <span class="tok-kw">var</span> pubkey: [<span class="tok-number">33</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L64">            pubkey[<span class="tok-number">0</span>] = self.recovery;</span>
+<span class="line" id="L65">            <span class="tok-builtin">@memcpy</span>(pubkey[<span class="tok-number">1</span>..<span class="tok-number">33</span>], &amp;self.key);</span>
+<span class="line" id="L66">            <span class="tok-kw">return</span> pubkey;</span>
+<span class="line" id="L67">        }</span>
+<span class="line" id="L68">    }</span>
+<span class="line" id="L69"></span>
+<span class="line" id="L70">    <span class="tok-comment">/// Derives a node from the given string-encoded path e.g. /44'/60'/0'/0</span></span>
+<span class="line" id="L71">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">derivePath</span>(self: Self, path: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !Self {</span>
+<span class="line" id="L72">        <span class="tok-kw">if</span> (path.len == <span class="tok-number">0</span>) {</span>
+<span class="line" id="L73">            <span class="tok-kw">return</span> self;</span>
+<span class="line" id="L74">        }</span>
+<span class="line" id="L75"></span>
+<span class="line" id="L76">        <span class="tok-kw">var</span> path_slice = path;</span>
+<span class="line" id="L77"></span>
+<span class="line" id="L78">        <span class="tok-kw">var</span> node = self;</span>
+<span class="line" id="L79"></span>
+<span class="line" id="L80">        <span class="tok-kw">while</span> (path_slice.len &gt; <span class="tok-number">0</span> <span class="tok-kw">and</span> path_slice[<span class="tok-number">0</span>] == <span class="tok-str">'/'</span>) {</span>
+<span class="line" id="L81">            path_slice = path_slice[<span class="tok-number">1</span>..];</span>
+<span class="line" id="L82"></span>
+<span class="line" id="L83">            <span class="tok-kw">var</span> i: <span class="tok-type">usize</span> = <span class="tok-number">0</span>;</span>
+<span class="line" id="L84">            <span class="tok-kw">while</span> (i &lt; path_slice.len <span class="tok-kw">and</span> std.ascii.isDigit(path_slice[i])) {</span>
+<span class="line" id="L85">                i += <span class="tok-number">1</span>;</span>
+<span class="line" id="L86">            }</span>
+<span class="line" id="L87"></span>
+<span class="line" id="L88">            <span class="tok-kw">var</span> hardened = <span class="tok-null">false</span>;</span>
+<span class="line" id="L89">            <span class="tok-kw">if</span> (i &lt; path_slice.len <span class="tok-kw">and</span> path_slice[i] == <span class="tok-str">'\''</span>) {</span>
+<span class="line" id="L90">                hardened = <span class="tok-null">true</span>;</span>
+<span class="line" id="L91">            }</span>
+<span class="line" id="L92"></span>
+<span class="line" id="L93">            <span class="tok-kw">var</span> index = std.fmt.parseInt(<span class="tok-type">u32</span>, path_slice[<span class="tok-number">0</span>..i], <span class="tok-number">10</span>) <span class="tok-kw">catch</span> <span class="tok-kw">unreachable</span>;</span>
+<span class="line" id="L94"></span>
+<span class="line" id="L95">            <span class="tok-kw">if</span> (hardened) {</span>
+<span class="line" id="L96">                index += std.math.pow(<span class="tok-type">u32</span>, <span class="tok-number">2</span>, <span class="tok-number">31</span>);</span>
+<span class="line" id="L97">                i += <span class="tok-number">1</span>;</span>
+<span class="line" id="L98">            }</span>
+<span class="line" id="L99"></span>
+<span class="line" id="L100">            node = <span class="tok-kw">try</span> node.derive(index);</span>
+<span class="line" id="L101"></span>
+<span class="line" id="L102">            path_slice = path_slice[i..];</span>
+<span class="line" id="L103">        }</span>
+<span class="line" id="L104"></span>
+<span class="line" id="L105">        <span class="tok-kw">if</span> (path_slice.len != <span class="tok-number">0</span>) {</span>
+<span class="line" id="L106">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidPath;</span>
+<span class="line" id="L107">        }</span>
+<span class="line" id="L108"></span>
+<span class="line" id="L109">        <span class="tok-kw">return</span> node;</span>
+<span class="line" id="L110">    }</span>
+<span class="line" id="L111"></span>
+<span class="line" id="L112">    <span class="tok-comment">/// Returns the child node at given index. Returns an error if the derived key</span></span>
+<span class="line" id="L113">    <span class="tok-comment">/// is not a valid curve point. In which case, the next i should be used.</span></span>
+<span class="line" id="L114">    <span class="tok-comment">/// Returns an error if trying to derive a child key with a neutered node and</span></span>
+<span class="line" id="L115">    <span class="tok-comment">/// the child key is hardened.</span></span>
+<span class="line" id="L116">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">derive</span>(self: Self, i: <span class="tok-type">u32</span>) !Self {</span>
+<span class="line" id="L117">        <span class="tok-kw">if</span> (self.recovery == <span class="tok-number">0</span>) {</span>
+<span class="line" id="L118">            <span class="tok-kw">return</span> self.dervivePrivate(i);</span>
+<span class="line" id="L119">        } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L120">            <span class="tok-kw">return</span> self.dervivePublic(i);</span>
+<span class="line" id="L121">        }</span>
+<span class="line" id="L122">    }</span>
+<span class="line" id="L123"></span>
+<span class="line" id="L124">    <span class="tok-kw">fn</span> <span class="tok-fn">dervivePublic</span>(self: Self, i: <span class="tok-type">u32</span>) !Self {</span>
+<span class="line" id="L125">        <span class="tok-kw">if</span> (i &gt;= std.math.pow(<span class="tok-type">u32</span>, <span class="tok-number">2</span>, <span class="tok-number">31</span>)) {</span>
+<span class="line" id="L126">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.CannotDeriveHardenedChild;</span>
+<span class="line" id="L127">        }</span>
+<span class="line" id="L128"></span>
+<span class="line" id="L129">        <span class="tok-kw">const</span> hmac = std.crypto.auth.hmac.sha2.HmacSha512;</span>
+<span class="line" id="L130">        <span class="tok-kw">var</span> out: [<span class="tok-number">64</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L131">        <span class="tok-kw">var</span> in: [<span class="tok-number">37</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L132"></span>
+<span class="line" id="L133">        <span class="tok-comment">// Data = ser_P(K_par) || ser_32(i)</span>
+</span>
+<span class="line" id="L134">        in[<span class="tok-number">0</span>] = self.recovery;</span>
+<span class="line" id="L135">        <span class="tok-builtin">@memcpy</span>(in[<span class="tok-number">1</span>..<span class="tok-number">33</span>], &amp;self.key);</span>
+<span class="line" id="L136">        std.mem.writeIntBig(<span class="tok-type">u32</span>, in[<span class="tok-number">33</span>..][<span class="tok-number">0</span>..<span class="tok-number">4</span>], i);</span>
+<span class="line" id="L137"></span>
+<span class="line" id="L138">        <span class="tok-comment">// HMAC-SHA512(c_par, Data)</span>
+</span>
+<span class="line" id="L139">        hmac.create(&amp;out, &amp;in, &amp;self.chain_code);</span>
+<span class="line" id="L140"></span>
+<span class="line" id="L141">        <span class="tok-comment">// ki = parse_256(IL) + k_par (mod n).</span>
+</span>
+<span class="line" id="L142">        <span class="tok-kw">const</span> kpar = <span class="tok-kw">try</span> curve.fromSec1(in[<span class="tok-number">0</span>..<span class="tok-number">33</span>]);</span>
+<span class="line" id="L143">        <span class="tok-kw">const</span> pubkey = <span class="tok-kw">try</span> curve.mul(curve.basePoint, out[<span class="tok-number">0</span>..<span class="tok-number">32</span>].*, .Big);</span>
+<span class="line" id="L144">        <span class="tok-kw">const</span> ki = pubkey.add(kpar);</span>
+<span class="line" id="L145"></span>
+<span class="line" id="L146">        <span class="tok-kw">const</span> compressed_point = ki.toCompressedSec1();</span>
+<span class="line" id="L147"></span>
+<span class="line" id="L148">        <span class="tok-kw">return</span> Self{</span>
+<span class="line" id="L149">            .recovery = compressed_point[<span class="tok-number">0</span>],</span>
+<span class="line" id="L150">            .key = compressed_point[<span class="tok-number">1</span>..<span class="tok-number">33</span>].*,</span>
+<span class="line" id="L151">            .chain_code = out[<span class="tok-number">32</span>..<span class="tok-number">64</span>].*,</span>
+<span class="line" id="L152">        };</span>
+<span class="line" id="L153">    }</span>
+<span class="line" id="L154"></span>
+<span class="line" id="L155">    <span class="tok-kw">fn</span> <span class="tok-fn">dervivePrivate</span>(self: Self, i: <span class="tok-type">u32</span>) !Self {</span>
+<span class="line" id="L156">        <span class="tok-kw">const</span> hmac = std.crypto.auth.hmac.sha2.HmacSha512;</span>
+<span class="line" id="L157">        <span class="tok-kw">var</span> out: [<span class="tok-number">64</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L158">        <span class="tok-kw">var</span> in: [<span class="tok-number">37</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L159"></span>
+<span class="line" id="L160">        <span class="tok-kw">if</span> (i &gt;= std.math.pow(<span class="tok-type">u32</span>, <span class="tok-number">2</span>, <span class="tok-number">31</span>)) {</span>
+<span class="line" id="L161">            <span class="tok-comment">// Data = 0x00 || ser_256(k_par) || ser_32(i)).</span>
+</span>
+<span class="line" id="L162">            in[<span class="tok-number">0</span>] = <span class="tok-number">0</span>;</span>
+<span class="line" id="L163">            <span class="tok-builtin">@memcpy</span>(in[<span class="tok-number">1</span>..<span class="tok-number">33</span>], &amp;self.key);</span>
+<span class="line" id="L164">        } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L165">            <span class="tok-comment">// Data = ser_P(point(k_par)) || ser_32(i)).</span>
+</span>
+<span class="line" id="L166">            <span class="tok-kw">const</span> pubkey = <span class="tok-kw">try</span> curve.mul(curve.basePoint, self.key, .Big);</span>
+<span class="line" id="L167">            <span class="tok-kw">const</span> compressed_point = pubkey.toCompressedSec1();</span>
+<span class="line" id="L168">            <span class="tok-builtin">@memcpy</span>(in[<span class="tok-number">0</span>..<span class="tok-number">33</span>], &amp;compressed_point);</span>
+<span class="line" id="L169">        }</span>
+<span class="line" id="L170"></span>
+<span class="line" id="L171">        std.mem.writeIntBig(<span class="tok-type">u32</span>, in[<span class="tok-number">33</span>..][<span class="tok-number">0</span>..<span class="tok-number">4</span>], i);</span>
+<span class="line" id="L172"></span>
+<span class="line" id="L173">        <span class="tok-comment">// HMAC-SHA512(c_par, Data)</span>
+</span>
+<span class="line" id="L174">        hmac.create(&amp;out, &amp;in, &amp;self.chain_code);</span>
+<span class="line" id="L175"></span>
+<span class="line" id="L176">        <span class="tok-kw">const</span> il = <span class="tok-kw">try</span> curve.scalar.Scalar.fromBytes(out[<span class="tok-number">0</span>..<span class="tok-number">32</span>].*, .Big);</span>
+<span class="line" id="L177">        <span class="tok-kw">const</span> kpar = <span class="tok-kw">try</span> curve.scalar.Scalar.fromBytes(self.key, .Big);</span>
+<span class="line" id="L178">        <span class="tok-kw">const</span> ki = il.add(kpar);</span>
+<span class="line" id="L179"></span>
+<span class="line" id="L180">        <span class="tok-kw">return</span> Self{</span>
+<span class="line" id="L181">            .recovery = <span class="tok-number">0</span>,</span>
+<span class="line" id="L182">            .key = ki.toBytes(.Big),</span>
+<span class="line" id="L183">            .chain_code = out[<span class="tok-number">32</span>..<span class="tok-number">64</span>].*,</span>
+<span class="line" id="L184">        };</span>
+<span class="line" id="L185">    }</span>
+<span class="line" id="L186"></span>
+<span class="line" id="L187">    <span class="tok-comment">/// Returns a &quot;neutered&quot; version of this node that is capable of deriving child pubkeys</span></span>
+<span class="line" id="L188">    <span class="tok-comment">/// but not child privkeys</span></span>
+<span class="line" id="L189">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">neuter</span>(self: Self) !Self {</span>
+<span class="line" id="L190">        <span class="tok-kw">const</span> pubkey = <span class="tok-kw">try</span> curve.mul(curve.basePoint, self.key, .Big);</span>
+<span class="line" id="L191">        <span class="tok-kw">const</span> compressed_point = pubkey.toCompressedSec1();</span>
+<span class="line" id="L192"></span>
+<span class="line" id="L193">        <span class="tok-kw">return</span> Self{</span>
+<span class="line" id="L194">            .recovery = compressed_point[<span class="tok-number">0</span>],</span>
+<span class="line" id="L195">            .key = compressed_point[<span class="tok-number">1</span>..<span class="tok-number">33</span>].*,</span>
+<span class="line" id="L196">            .chain_code = self.chain_code,</span>
+<span class="line" id="L197">        };</span>
+<span class="line" id="L198">    }</span>
+<span class="line" id="L199">};</span>
+<span class="line" id="L200"></span>
+<span class="line" id="L201"><span class="tok-kw">test</span> <span class="tok-str">&quot;neutering&quot;</span> {</span>
+<span class="line" id="L202">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
+<span class="line" id="L203"></span>
+<span class="line" id="L204">    <span class="tok-kw">const</span> seed = <span class="tok-kw">try</span> web3.mnemonic.seedFromMnemonic(<span class="tok-str">&quot;rose update response coin cream column wine timber lens repeat short trial mean pear conduct jealous ready negative mind army dance pulse noise capable&quot;</span>);</span>
+<span class="line" id="L205">    <span class="tok-kw">const</span> master_node = Node.fromSeed(&amp;seed);</span>
+<span class="line" id="L206"></span>
+<span class="line" id="L207">    <span class="tok-comment">// Derive m/0</span>
+</span>
+<span class="line" id="L208">    <span class="tok-kw">const</span> node = <span class="tok-kw">try</span> master_node.derive(<span class="tok-number">0</span>);</span>
+<span class="line" id="L209"></span>
+<span class="line" id="L210">    <span class="tok-comment">// Derive m/0/1</span>
+</span>
+<span class="line" id="L211">    <span class="tok-kw">const</span> child = <span class="tok-kw">try</span> node.derive(<span class="tok-number">1</span>);</span>
+<span class="line" id="L212"></span>
+<span class="line" id="L213">    <span class="tok-comment">// Neuter node and derive m/0/1</span>
+</span>
+<span class="line" id="L214">    <span class="tok-kw">const</span> neutered_node = <span class="tok-kw">try</span> node.neuter();</span>
+<span class="line" id="L215">    <span class="tok-kw">const</span> neutered_child = <span class="tok-kw">try</span> neutered_node.derive(<span class="tok-number">1</span>);</span>
+<span class="line" id="L216"></span>
+<span class="line" id="L217">    <span class="tok-comment">// Neutered node should produce same public key</span>
+</span>
+<span class="line" id="L218">    assert(std.mem.eql(<span class="tok-type">u8</span>, &amp;<span class="tok-kw">try</span> child.getPublicKey(), &amp;<span class="tok-kw">try</span> neutered_child.getPublicKey()));</span>
+<span class="line" id="L219">}</span>
+<span class="line" id="L220"></span>
+<span class="line" id="L221"><span class="tok-kw">test</span> <span class="tok-str">&quot;path derivation&quot;</span> {</span>
+<span class="line" id="L222">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
+<span class="line" id="L223"></span>
+<span class="line" id="L224">    <span class="tok-kw">const</span> seed = <span class="tok-kw">try</span> web3.mnemonic.seedFromMnemonic(<span class="tok-str">&quot;rose update response coin cream column wine timber lens repeat short trial mean pear conduct jealous ready negative mind army dance pulse noise capable&quot;</span>);</span>
+<span class="line" id="L225">    <span class="tok-kw">const</span> account_node = <span class="tok-kw">try</span> Node.fromSeedAndPath(&amp;seed, <span class="tok-str">&quot;m/44'/0'/0'/0&quot;</span>);</span>
+<span class="line" id="L226"></span>
+<span class="line" id="L227">    <span class="tok-kw">const</span> node = <span class="tok-kw">try</span> account_node.derive(<span class="tok-number">0</span>);</span>
+<span class="line" id="L228"></span>
+<span class="line" id="L229">    <span class="tok-kw">var</span> hex_priv: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L230">    _ = <span class="tok-kw">try</span> std.fmt.hexToBytes(&amp;hex_priv, <span class="tok-str">&quot;cbc3ab34be3c6e627420a33ffbc296ea409770ec0cbfdba084f111d7b8be472c&quot;</span>);</span>
+<span class="line" id="L231">    assert(std.mem.eql(<span class="tok-type">u8</span>, &amp;<span class="tok-kw">try</span> node.getPrivateKey(), &amp;hex_priv));</span>
+<span class="line" id="L232"></span>
+<span class="line" id="L233">    <span class="tok-kw">var</span> hex_pub: [<span class="tok-number">33</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L234">    _ = <span class="tok-kw">try</span> std.fmt.hexToBytes(&amp;hex_pub, <span class="tok-str">&quot;03e6f48804f69f7c17949de28ea65d2bfe16d4af206d854099d23297dd2a490c15&quot;</span>);</span>
+<span class="line" id="L235">    assert(std.mem.eql(<span class="tok-type">u8</span>, &amp;<span class="tok-kw">try</span> node.getPublicKey(), &amp;hex_pub));</span>
+<span class="line" id="L236">}</span>
+<span class="line" id="L237"></span>
+</code></pre></body>
+</html>

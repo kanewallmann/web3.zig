@@ -154,7 +154,7 @@
 <span class="line" id="L41">    }</span>
 <span class="line" id="L42">};</span>
 <span class="line" id="L43"></span>
-<span class="line" id="L44"><span class="tok-comment">/// Abstraction around Ethereum contracts (incomplete)</span></span>
+<span class="line" id="L44"><span class="tok-comment">/// Abstraction around Ethereum contracts (currently being refactored)</span></span>
 <span class="line" id="L45"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> Contract = <span class="tok-kw">struct</span> {</span>
 <span class="line" id="L46">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
 <span class="line" id="L47"></span>
@@ -274,7 +274,7 @@
 <span class="line" id="L160">                .from = opts.from,</span>
 <span class="line" id="L161">                .to = self.address,</span>
 <span class="line" id="L162">                .value = opts.value,</span>
-<span class="line" id="L163">                .data = calldata,</span>
+<span class="line" id="L163">                .data = web3.DataHexString.wrap(calldata),</span>
 <span class="line" id="L164">                .gas = opts.gas,</span>
 <span class="line" id="L165">                .max_fee_per_gas = tx.max_fee_per_gas,</span>
 <span class="line" id="L166">                .max_priority_fee_per_gas = tx.max_priority_fee_per_gas,</span>
@@ -283,7 +283,7 @@
 <span class="line" id="L169">                .from = opts.from,</span>
 <span class="line" id="L170">                .to = self.address,</span>
 <span class="line" id="L171">                .value = opts.value,</span>
-<span class="line" id="L172">                .data = calldata,</span>
+<span class="line" id="L172">                .data = web3.DataHexString.wrap(calldata),</span>
 <span class="line" id="L173">                .gas = opts.gas,</span>
 <span class="line" id="L174">                .gas_price = tx.gas_price,</span>
 <span class="line" id="L175">            }, opts.block_tag),</span>
@@ -295,19 +295,44 @@
 <span class="line" id="L181"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> Provider = <span class="tok-kw">struct</span> {</span>
 <span class="line" id="L182">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
 <span class="line" id="L183"></span>
-<span class="line" id="L184">    <span class="tok-comment">// The type erased pointer to the allocator implementation</span>
+<span class="line" id="L184">    <span class="tok-comment">// The type erased pointer to the implementation</span>
 </span>
 <span class="line" id="L185">    ptr: *<span class="tok-type">anyopaque</span>,</span>
 <span class="line" id="L186">    vtable: *<span class="tok-kw">const</span> VTable,</span>
 <span class="line" id="L187"></span>
 <span class="line" id="L188">    <span class="tok-kw">pub</span> <span class="tok-kw">const</span> VTable = <span class="tok-kw">struct</span> {</span>
 <span class="line" id="L189">        call: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) <span class="tok-type">anyerror</span>![]<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
-<span class="line" id="L190">    };</span>
-<span class="line" id="L191"></span>
-<span class="line" id="L192">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">call</span>(self: Self, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
-<span class="line" id="L193">        <span class="tok-kw">return</span> self.vtable.call(self.ptr, tx, block_tag);</span>
-<span class="line" id="L194">    }</span>
-<span class="line" id="L195">};</span>
+<span class="line" id="L190">        estimateGas: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, tx: web3.TransactionRequest) <span class="tok-type">anyerror</span>!<span class="tok-type">u256</span>,</span>
+<span class="line" id="L191">        send: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, tx: web3.TransactionRequest) <span class="tok-type">anyerror</span>!web3.Hash,</span>
+<span class="line" id="L192">        sendRaw: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, raw_tx: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) <span class="tok-type">anyerror</span>!web3.Hash,</span>
+<span class="line" id="L193">        getTransactionCount: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, address: web3.Address, block_tag: ?web3.BlockTag) <span class="tok-type">anyerror</span>!<span class="tok-type">u256</span>,</span>
+<span class="line" id="L194">        getFeeEstimate: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, speed: web3.FeeEstimateSpeed) <span class="tok-type">anyerror</span>!web3.FeeEstimate,</span>
+<span class="line" id="L195">    };</span>
 <span class="line" id="L196"></span>
+<span class="line" id="L197">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">call</span>(self: Self, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
+<span class="line" id="L198">        <span class="tok-kw">return</span> self.vtable.call(self.ptr, tx, block_tag);</span>
+<span class="line" id="L199">    }</span>
+<span class="line" id="L200"></span>
+<span class="line" id="L201">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">estimateGas</span>(self: Self, tx: web3.TransactionRequest) !<span class="tok-type">u256</span> {</span>
+<span class="line" id="L202">        <span class="tok-kw">return</span> self.vtable.estimateGas(self.ptr, tx);</span>
+<span class="line" id="L203">    }</span>
+<span class="line" id="L204"></span>
+<span class="line" id="L205">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">send</span>(self: Self, tx: web3.TransactionRequest) !web3.Hash {</span>
+<span class="line" id="L206">        <span class="tok-kw">return</span> self.vtable.send(self.ptr, tx);</span>
+<span class="line" id="L207">    }</span>
+<span class="line" id="L208"></span>
+<span class="line" id="L209">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">sendRaw</span>(self: Self, raw_tx: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !web3.Hash {</span>
+<span class="line" id="L210">        <span class="tok-kw">return</span> self.vtable.sendRaw(self.ptr, raw_tx);</span>
+<span class="line" id="L211">    }</span>
+<span class="line" id="L212"></span>
+<span class="line" id="L213">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">getTransactionCount</span>(self: Self, address: web3.Address, block_tag: ?web3.BlockTag) !<span class="tok-type">u256</span> {</span>
+<span class="line" id="L214">        <span class="tok-kw">return</span> self.vtable.getTransactionCount(self.ptr, address, block_tag);</span>
+<span class="line" id="L215">    }</span>
+<span class="line" id="L216"></span>
+<span class="line" id="L217">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">getFeeEstimate</span>(self: Self, speed: web3.FeeEstimateSpeed) !web3.FeeEstimate {</span>
+<span class="line" id="L218">        <span class="tok-kw">return</span> self.vtable.getFeeEstimate(self.ptr, speed);</span>
+<span class="line" id="L219">    }</span>
+<span class="line" id="L220">};</span>
+<span class="line" id="L221"></span>
 </code></pre></body>
 </html>

@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">    <title>mnemonic.zig - source view</title>
+    <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAPNJREFUeNpi/P//PwMlgOXHUjly9E0G4hwgZmQiQZMqEK8H4v9QzUEgQSaoADK+zhH9iAGL+C0gDoAaNg9mGLoLfgA1awK9hS9gzgJxA9RQBmQDrgMxJzRMGKE4HYj/Ial5A8QmQLwCJoBsgBYW2+TR1ChDaWt4LOBxKsi/VUh8XiD+gq4IVyzwQAMJBoKwacZlAB8Qf0bi96IZhtOAe1D6LpqaEiz6rmEzQAeIzwGxCJpieFqApo/vQKyJboAaEBsAsSEupwI1MwKjGBTVHOhegMX5UajYRqiBjMgYmj400cVh0XgTiKdC0zhJgJHS7AwQYABm9EAdCKrEfAAAAABJRU5ErkJggg=="/>
+    <style>
+      body{
+        font-family: system-ui, -apple-system, Roboto, "Segoe UI", sans-serif;
+        margin: 0;
+        line-height: 1.5;
+      }
+
+      pre > code {
+        display: block;
+        overflow: auto;
+        line-height: normal;
+        margin: 0em;
+      }
+      .tok-kw {
+          color: #333;
+          font-weight: bold;
+      }
+      .tok-str {
+          color: #d14;
+      }
+      .tok-builtin {
+          color: #005C7A;
+      }
+      .tok-comment {
+          color: #545454;
+          font-style: italic;
+      }
+      .tok-fn {
+          color: #900;
+          font-weight: bold;
+      }
+      .tok-null {
+          color: #005C5C;
+      }
+      .tok-number {
+          color: #005C5C;
+      }
+      .tok-type {
+          color: #458;
+          font-weight: bold;
+      }
+      pre {
+        counter-reset: line;
+      }
+      pre .line:before {
+        counter-increment: line;
+        content: counter(line);
+        display: inline-block;
+        padding-right: 1em;
+        width: 2em;
+        text-align: right;
+        color: #999;
+      }
+      
+      .line {
+        width: 100%;
+        display: inline-block;
+      }
+      .line:target {
+        border-top: 1px solid #ccc;
+        border-bottom: 1px solid #ccc;
+        background: #fafafa;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body{
+            background:#222;
+            color: #ccc;
+        }
+        pre > code {
+            color: #ccc;
+            background: #222;
+            border: unset;
+        }
+        .line:target {
+            border-top: 1px solid #444;
+            border-bottom: 1px solid #444;
+            background: #333;
+        }
+        .tok-kw {
+            color: #eee;
+        }
+        .tok-str {
+            color: #2e5;
+        }
+        .tok-builtin {
+            color: #ff894c;
+        }
+        .tok-comment {
+            color: #aa7;
+        }
+        .tok-fn {
+            color: #B1A0F8;
+        }
+        .tok-null {
+            color: #ff8080;
+        }
+        .tok-number {
+            color: #ff8080;
+        }
+        .tok-type {
+            color: #68f;
+        }
+      }
+    </style>
+</head>
+<body>
+<pre><code><span class="line" id="L1"><span class="tok-comment">//! Implements the bip-39 standard for generatic deterministic keys from mnemonic codes</span></span>
+<span class="line" id="L2"><span class="tok-comment">//! Reference: https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki</span></span>
+<span class="line" id="L3"></span>
+<span class="line" id="L4"><span class="tok-kw">const</span> std = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;std&quot;</span>);</span>
+<span class="line" id="L5"></span>
+<span class="line" id="L6"><span class="tok-kw">const</span> web3 = <span class="tok-builtin">@import</span>(<span class="tok-str">&quot;web3.zig&quot;</span>);</span>
+<span class="line" id="L7"></span>
+<span class="line" id="L8"><span class="tok-comment">// TODO: Add other languages</span>
+</span>
+<span class="line" id="L9"><span class="tok-comment">/// The default English word list</span></span>
+<span class="line" id="L10"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> english = WordList.load(<span class="tok-builtin">@embedFile</span>(<span class="tok-str">&quot;wordlists/english.txt&quot;</span>));</span>
+<span class="line" id="L11"></span>
+<span class="line" id="L12"><span class="tok-comment">/// Represents a 2048-word word list (assumed to be alphabetical per the bip-39 standard)</span></span>
+<span class="line" id="L13"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> WordList = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L14">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L15"></span>
+<span class="line" id="L16">    words: [<span class="tok-number">2048</span>][]<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
+<span class="line" id="L17"></span>
+<span class="line" id="L18">    <span class="tok-comment">/// Loads a word list from a given new line separated string</span></span>
+<span class="line" id="L19">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">load</span>(raw: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) Self {</span>
+<span class="line" id="L20">        <span class="tok-kw">return</span> Self{</span>
+<span class="line" id="L21">            .words = loadWordList(raw),</span>
+<span class="line" id="L22">        };</span>
+<span class="line" id="L23">    }</span>
+<span class="line" id="L24"></span>
+<span class="line" id="L25">    <span class="tok-comment">/// Performs a search of the given word and returns it's index.</span></span>
+<span class="line" id="L26">    <span class="tok-comment">/// Returns an error if the word isn't in the list.</span></span>
+<span class="line" id="L27">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">lookup</span>(self: Self, word: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !<span class="tok-type">u16</span> {</span>
+<span class="line" id="L28">        <span class="tok-kw">if</span> (word.len == <span class="tok-number">0</span>) {</span>
+<span class="line" id="L29">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.WordNotFound;</span>
+<span class="line" id="L30">        }</span>
+<span class="line" id="L31"></span>
+<span class="line" id="L32">        <span class="tok-kw">const</span> first_letter = word[<span class="tok-number">0</span>];</span>
+<span class="line" id="L33"></span>
+<span class="line" id="L34">        <span class="tok-comment">// Binary search on first letter</span>
+</span>
+<span class="line" id="L35">        <span class="tok-kw">var</span> half: <span class="tok-type">u16</span> = self.words.len / <span class="tok-number">2</span>;</span>
+<span class="line" id="L36">        <span class="tok-kw">var</span> i: <span class="tok-type">u16</span> = half;</span>
+<span class="line" id="L37"></span>
+<span class="line" id="L38">        <span class="tok-kw">while</span> (self.words[i][<span class="tok-number">0</span>] != first_letter) {</span>
+<span class="line" id="L39">            <span class="tok-kw">const</span> letter = self.words[i][<span class="tok-number">0</span>];</span>
+<span class="line" id="L40"></span>
+<span class="line" id="L41">            <span class="tok-kw">if</span> (first_letter &gt; letter) {</span>
+<span class="line" id="L42">                half /= <span class="tok-number">2</span>;</span>
+<span class="line" id="L43">                i += half;</span>
+<span class="line" id="L44">            } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L45">                half /= <span class="tok-number">2</span>;</span>
+<span class="line" id="L46">                i -= half;</span>
+<span class="line" id="L47">            }</span>
+<span class="line" id="L48">        }</span>
+<span class="line" id="L49"></span>
+<span class="line" id="L50">        <span class="tok-comment">// Scan alphabetically from here</span>
+</span>
+<span class="line" id="L51">        <span class="tok-kw">var</span> j: <span class="tok-type">usize</span> = <span class="tok-number">1</span>;</span>
+<span class="line" id="L52"></span>
+<span class="line" id="L53">        <span class="tok-kw">while</span> (j &lt; word.len <span class="tok-kw">and</span> self.words[i][j] == word[j]) {</span>
+<span class="line" id="L54">            j += <span class="tok-number">1</span>;</span>
+<span class="line" id="L55">        }</span>
+<span class="line" id="L56"></span>
+<span class="line" id="L57">        <span class="tok-kw">if</span> (j == word.len) {</span>
+<span class="line" id="L58">            <span class="tok-kw">return</span> i;</span>
+<span class="line" id="L59">        }</span>
+<span class="line" id="L60"></span>
+<span class="line" id="L61">        <span class="tok-kw">const</span> dir: <span class="tok-type">isize</span> = <span class="tok-kw">if</span> (word[j] &gt; self.words[i][j]) <span class="tok-number">1</span> <span class="tok-kw">else</span> -<span class="tok-number">1</span>;</span>
+<span class="line" id="L62"></span>
+<span class="line" id="L63">        <span class="tok-kw">while</span> (j &lt; word.len <span class="tok-kw">and</span> self.words[i][j - <span class="tok-number">1</span>] == word[j - <span class="tok-number">1</span>]) {</span>
+<span class="line" id="L64">            i = <span class="tok-builtin">@intCast</span>(<span class="tok-builtin">@as</span>(<span class="tok-type">isize</span>, <span class="tok-builtin">@intCast</span>(i)) + dir);</span>
+<span class="line" id="L65"></span>
+<span class="line" id="L66">            <span class="tok-kw">while</span> (j &lt; word.len <span class="tok-kw">and</span> j &lt; self.words[i].len <span class="tok-kw">and</span> self.words[i][j] == word[j]) {</span>
+<span class="line" id="L67">                j += <span class="tok-number">1</span>;</span>
+<span class="line" id="L68">            }</span>
+<span class="line" id="L69">        }</span>
+<span class="line" id="L70"></span>
+<span class="line" id="L71">        <span class="tok-kw">if</span> (j == word.len) {</span>
+<span class="line" id="L72">            <span class="tok-kw">return</span> i;</span>
+<span class="line" id="L73">        }</span>
+<span class="line" id="L74"></span>
+<span class="line" id="L75">        <span class="tok-kw">return</span> <span class="tok-kw">error</span>.WordNotFound;</span>
+<span class="line" id="L76">    }</span>
+<span class="line" id="L77"></span>
+<span class="line" id="L78">    <span class="tok-comment">/// Allocates and returns the entropy encoded in the given mnemonic phrase.</span></span>
+<span class="line" id="L79">    <span class="tok-comment">/// If word count is known at comptime, prefer the `getEntropy` method instead.</span></span>
+<span class="line" id="L80">    <span class="tok-comment">/// Returns an error if the mnemonic contains invalid words or bad checksum.</span></span>
+<span class="line" id="L81">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">decodeAlloc</span>(self: Self, allocator: std.mem.Allocator, mnemonic: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) ![]<span class="tok-type">u8</span> {</span>
+<span class="line" id="L82">        <span class="tok-kw">var</span> word_count: <span class="tok-type">u16</span> = <span class="tok-number">1</span>;</span>
+<span class="line" id="L83">        <span class="tok-kw">var</span> i: <span class="tok-type">usize</span> = <span class="tok-number">0</span>;</span>
+<span class="line" id="L84"></span>
+<span class="line" id="L85">        <span class="tok-kw">while</span> (i &lt; mnemonic.len) : (i += <span class="tok-number">1</span>) {</span>
+<span class="line" id="L86">            <span class="tok-kw">if</span> (mnemonic[i] == <span class="tok-str">' '</span>) {</span>
+<span class="line" id="L87">                word_count += <span class="tok-number">1</span>;</span>
+<span class="line" id="L88">            }</span>
+<span class="line" id="L89">        }</span>
+<span class="line" id="L90"></span>
+<span class="line" id="L91">        <span class="tok-kw">if</span> (word_count != <span class="tok-number">12</span> <span class="tok-kw">and</span> word_count != <span class="tok-number">15</span> <span class="tok-kw">and</span> word_count != <span class="tok-number">18</span> <span class="tok-kw">and</span> word_count != <span class="tok-number">21</span> <span class="tok-kw">and</span> word_count != <span class="tok-number">24</span>) {</span>
+<span class="line" id="L92">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidMnemonic;</span>
+<span class="line" id="L93">        }</span>
+<span class="line" id="L94"></span>
+<span class="line" id="L95">        <span class="tok-kw">const</span> checksum_bits: <span class="tok-type">u16</span> = word_count / <span class="tok-number">3</span>;</span>
+<span class="line" id="L96">        <span class="tok-kw">const</span> entropy_bits: <span class="tok-type">u16</span> = <span class="tok-builtin">@intCast</span>(word_count * <span class="tok-number">11</span> - checksum_bits);</span>
+<span class="line" id="L97">        <span class="tok-kw">const</span> entropy_bytes: <span class="tok-type">u16</span> = std.math.divCeil(<span class="tok-type">u16</span>, entropy_bits, <span class="tok-number">8</span>) <span class="tok-kw">catch</span> <span class="tok-kw">unreachable</span>;</span>
+<span class="line" id="L98"></span>
+<span class="line" id="L99">        <span class="tok-kw">var</span> out = <span class="tok-kw">try</span> allocator.alloc(<span class="tok-type">u8</span>, entropy_bytes);</span>
+<span class="line" id="L100"></span>
+<span class="line" id="L101">        <span class="tok-kw">switch</span> (word_count) {</span>
+<span class="line" id="L102">            <span class="tok-number">12</span> =&gt; <span class="tok-builtin">@memcpy</span>(out, &amp;(<span class="tok-kw">try</span> self.decode(<span class="tok-number">12</span>, mnemonic))),</span>
+<span class="line" id="L103">            <span class="tok-number">15</span> =&gt; <span class="tok-builtin">@memcpy</span>(out, &amp;(<span class="tok-kw">try</span> self.decode(<span class="tok-number">15</span>, mnemonic))),</span>
+<span class="line" id="L104">            <span class="tok-number">18</span> =&gt; <span class="tok-builtin">@memcpy</span>(out, &amp;(<span class="tok-kw">try</span> self.decode(<span class="tok-number">18</span>, mnemonic))),</span>
+<span class="line" id="L105">            <span class="tok-number">21</span> =&gt; <span class="tok-builtin">@memcpy</span>(out, &amp;(<span class="tok-kw">try</span> self.decode(<span class="tok-number">21</span>, mnemonic))),</span>
+<span class="line" id="L106">            <span class="tok-number">24</span> =&gt; <span class="tok-builtin">@memcpy</span>(out, &amp;(<span class="tok-kw">try</span> self.decode(<span class="tok-number">24</span>, mnemonic))),</span>
+<span class="line" id="L107">            <span class="tok-kw">else</span> =&gt; <span class="tok-kw">unreachable</span>,</span>
+<span class="line" id="L108">        }</span>
+<span class="line" id="L109"></span>
+<span class="line" id="L110">        <span class="tok-kw">return</span> out;</span>
+<span class="line" id="L111">    }</span>
+<span class="line" id="L112"></span>
+<span class="line" id="L113">    <span class="tok-comment">/// Decodes a given 12,15,18,21,24 word mnemonic phrase encoded in bip-39 format and returns the entropy.</span></span>
+<span class="line" id="L114">    <span class="tok-comment">/// Returns an error if the mnemonic contains invalid words or bad checksum.</span></span>
+<span class="line" id="L115">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">decode</span>(self: Self, <span class="tok-kw">comptime</span> word_count: <span class="tok-type">comptime_int</span>, mnemonic: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) ![(word_count * <span class="tok-number">11</span> - word_count / <span class="tok-number">3</span>) / <span class="tok-number">8</span>]<span class="tok-type">u8</span> {</span>
+<span class="line" id="L116">        <span class="tok-kw">if</span> (word_count != <span class="tok-number">12</span> <span class="tok-kw">and</span> word_count != <span class="tok-number">15</span> <span class="tok-kw">and</span> word_count != <span class="tok-number">18</span> <span class="tok-kw">and</span> word_count != <span class="tok-number">21</span> <span class="tok-kw">and</span> word_count != <span class="tok-number">24</span>) {</span>
+<span class="line" id="L117">            <span class="tok-builtin">@compileError</span>(<span class="tok-str">&quot;Invalid word count&quot;</span>);</span>
+<span class="line" id="L118">        }</span>
+<span class="line" id="L119"></span>
+<span class="line" id="L120">        <span class="tok-kw">const</span> checksum_bits: <span class="tok-type">u16</span> = <span class="tok-kw">comptime</span> word_count / <span class="tok-number">3</span>;</span>
+<span class="line" id="L121">        <span class="tok-kw">const</span> entropy_bits: <span class="tok-type">u16</span> = <span class="tok-builtin">@intCast</span>(word_count * <span class="tok-number">11</span> - checksum_bits);</span>
+<span class="line" id="L122">        <span class="tok-kw">const</span> entropy_bytes: <span class="tok-type">u16</span> = <span class="tok-kw">comptime</span> std.math.divCeil(<span class="tok-type">u16</span>, entropy_bits, <span class="tok-number">8</span>) <span class="tok-kw">catch</span> <span class="tok-kw">unreachable</span>;</span>
+<span class="line" id="L123"></span>
+<span class="line" id="L124">        <span class="tok-kw">var</span> buffer = mnemonic;</span>
+<span class="line" id="L125">        <span class="tok-kw">var</span> out: [entropy_bytes + <span class="tok-number">1</span>]<span class="tok-type">u8</span> = .{<span class="tok-number">0</span>} ** (entropy_bytes + <span class="tok-number">1</span>);</span>
+<span class="line" id="L126"></span>
+<span class="line" id="L127">        <span class="tok-kw">var</span> i: <span class="tok-type">usize</span> = <span class="tok-number">0</span>;</span>
+<span class="line" id="L128">        <span class="tok-kw">var</span> offset: <span class="tok-type">usize</span> = <span class="tok-number">0</span>;</span>
+<span class="line" id="L129"></span>
+<span class="line" id="L130">        <span class="tok-kw">while</span> (buffer.len &gt; <span class="tok-number">0</span> <span class="tok-kw">and</span> i &lt; word_count) : (i += <span class="tok-number">1</span>) {</span>
+<span class="line" id="L131">            <span class="tok-comment">// Iterate to next space (or eof)</span>
+</span>
+<span class="line" id="L132">            <span class="tok-kw">var</span> word_len: <span class="tok-type">usize</span> = <span class="tok-number">0</span>;</span>
+<span class="line" id="L133">            <span class="tok-kw">while</span> (word_len &lt; buffer.len <span class="tok-kw">and</span> buffer[word_len] != <span class="tok-str">' '</span>) : (word_len += <span class="tok-number">1</span>) {}</span>
+<span class="line" id="L134"></span>
+<span class="line" id="L135">            <span class="tok-comment">// Lookup word index</span>
+</span>
+<span class="line" id="L136">            <span class="tok-kw">const</span> word = buffer[<span class="tok-number">0</span>..word_len];</span>
+<span class="line" id="L137">            <span class="tok-kw">var</span> index: <span class="tok-type">u16</span> = <span class="tok-builtin">@intCast</span>(<span class="tok-kw">try</span> self.lookup(word));</span>
+<span class="line" id="L138"></span>
+<span class="line" id="L139">            <span class="tok-comment">// Loop over words and append each 11 bit value to the buffer</span>
+</span>
+<span class="line" id="L140">            <span class="tok-kw">var</span> in_bits_remaining: <span class="tok-type">usize</span> = <span class="tok-number">11</span>;</span>
+<span class="line" id="L141">            <span class="tok-kw">while</span> (in_bits_remaining &gt; <span class="tok-number">0</span>) {</span>
+<span class="line" id="L142">                <span class="tok-kw">const</span> byte_index = offset / <span class="tok-number">8</span>;</span>
+<span class="line" id="L143">                <span class="tok-kw">const</span> out_bit_offset = <span class="tok-builtin">@rem</span>(offset, <span class="tok-number">8</span>);</span>
+<span class="line" id="L144">                <span class="tok-kw">const</span> bits_remaining = <span class="tok-number">8</span> - out_bit_offset;</span>
+<span class="line" id="L145"></span>
+<span class="line" id="L146">                <span class="tok-kw">const</span> in_bit_offset: <span class="tok-type">isize</span> = <span class="tok-builtin">@as</span>(<span class="tok-type">isize</span>, <span class="tok-builtin">@intCast</span>(in_bits_remaining)) - <span class="tok-number">8</span> + <span class="tok-builtin">@as</span>(<span class="tok-type">isize</span>, <span class="tok-builtin">@intCast</span>(out_bit_offset));</span>
+<span class="line" id="L147">                <span class="tok-kw">var</span> in_val: <span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L148"></span>
+<span class="line" id="L149">                <span class="tok-kw">if</span> (in_bit_offset &gt; <span class="tok-number">0</span>) {</span>
+<span class="line" id="L150">                    in_val = <span class="tok-builtin">@truncate</span>(index &gt;&gt; <span class="tok-builtin">@intCast</span>(in_bit_offset));</span>
+<span class="line" id="L151">                } <span class="tok-kw">else</span> <span class="tok-kw">if</span> (in_bit_offset &lt; <span class="tok-number">0</span>) {</span>
+<span class="line" id="L152">                    in_val = <span class="tok-builtin">@truncate</span>(index &lt;&lt; <span class="tok-builtin">@intCast</span>(-in_bit_offset));</span>
+<span class="line" id="L153">                    in_val &amp;= <span class="tok-builtin">@truncate</span>(<span class="tok-builtin">@as</span>(<span class="tok-type">u8</span>, <span class="tok-number">255</span>) &lt;&lt; <span class="tok-builtin">@intCast</span>(-in_bit_offset));</span>
+<span class="line" id="L154">                } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L155">                    in_val = <span class="tok-builtin">@truncate</span>(index);</span>
+<span class="line" id="L156">                }</span>
+<span class="line" id="L157"></span>
+<span class="line" id="L158">                out[byte_index] |= in_val;</span>
+<span class="line" id="L159"></span>
+<span class="line" id="L160">                <span class="tok-kw">if</span> (in_bits_remaining &lt; bits_remaining) {</span>
+<span class="line" id="L161">                    offset += in_bits_remaining;</span>
+<span class="line" id="L162">                    in_bits_remaining = <span class="tok-number">0</span>;</span>
+<span class="line" id="L163">                } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L164">                    in_bits_remaining -= bits_remaining;</span>
+<span class="line" id="L165">                    offset += bits_remaining;</span>
+<span class="line" id="L166">                }</span>
+<span class="line" id="L167">            }</span>
+<span class="line" id="L168"></span>
+<span class="line" id="L169">            <span class="tok-comment">// Chop word off buffer and repeat</span>
+</span>
+<span class="line" id="L170">            <span class="tok-kw">if</span> (word_len == buffer.len) {</span>
+<span class="line" id="L171">                buffer = buffer[word_len..];</span>
+<span class="line" id="L172">            } <span class="tok-kw">else</span> {</span>
+<span class="line" id="L173">                buffer = buffer[word_len + <span class="tok-number">1</span> ..];</span>
+<span class="line" id="L174">            }</span>
+<span class="line" id="L175">        }</span>
+<span class="line" id="L176"></span>
+<span class="line" id="L177">        <span class="tok-comment">// Check we consumed correct number of words</span>
+</span>
+<span class="line" id="L178">        <span class="tok-kw">if</span> (i != word_count <span class="tok-kw">or</span> buffer.len != <span class="tok-number">0</span>) {</span>
+<span class="line" id="L179">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidMnemonic;</span>
+<span class="line" id="L180">        }</span>
+<span class="line" id="L181"></span>
+<span class="line" id="L182">        <span class="tok-kw">const</span> entropy = out[<span class="tok-number">0</span>..entropy_bytes].*;</span>
+<span class="line" id="L183">        <span class="tok-kw">const</span> checksum = out[entropy_bytes];</span>
+<span class="line" id="L184"></span>
+<span class="line" id="L185">        <span class="tok-comment">// Check checksum is correct</span>
+</span>
+<span class="line" id="L186">        <span class="tok-kw">const</span> hash = web3.sha256(&amp;entropy);</span>
+<span class="line" id="L187">        <span class="tok-kw">const</span> expected_checksum = hash.raw[<span class="tok-number">0</span>] &amp; ((std.math.pow(<span class="tok-type">u16</span>, <span class="tok-number">2</span>, checksum_bits) - <span class="tok-number">1</span>) &lt;&lt; (<span class="tok-number">8</span> - checksum_bits));</span>
+<span class="line" id="L188">        <span class="tok-kw">if</span> (checksum != expected_checksum) {</span>
+<span class="line" id="L189">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.InvalidChecksum;</span>
+<span class="line" id="L190">        }</span>
+<span class="line" id="L191"></span>
+<span class="line" id="L192">        <span class="tok-kw">return</span> entropy;</span>
+<span class="line" id="L193">    }</span>
+<span class="line" id="L194"></span>
+<span class="line" id="L195">    <span class="tok-kw">test</span> <span class="tok-str">&quot;word list&quot;</span> {</span>
+<span class="line" id="L196">        <span class="tok-kw">const</span> assert = std.debug.assert;</span>
+<span class="line" id="L197"></span>
+<span class="line" id="L198">        {</span>
+<span class="line" id="L199">            <span class="tok-kw">const</span> k = <span class="tok-kw">try</span> english.lookup(<span class="tok-str">&quot;spike&quot;</span>);</span>
+<span class="line" id="L200">            assert(k == <span class="tok-number">1678</span>);</span>
+<span class="line" id="L201">        }</span>
+<span class="line" id="L202"></span>
+<span class="line" id="L203">        {</span>
+<span class="line" id="L204">            <span class="tok-kw">const</span> k = <span class="tok-kw">try</span> english.lookup(<span class="tok-str">&quot;prepare&quot;</span>);</span>
+<span class="line" id="L205">            assert(k == <span class="tok-number">1359</span>);</span>
+<span class="line" id="L206">        }</span>
+<span class="line" id="L207"></span>
+<span class="line" id="L208">        {</span>
+<span class="line" id="L209">            <span class="tok-kw">const</span> k = <span class="tok-kw">try</span> english.lookup(<span class="tok-str">&quot;zoo&quot;</span>);</span>
+<span class="line" id="L210">            assert(k == <span class="tok-number">2047</span>);</span>
+<span class="line" id="L211">        }</span>
+<span class="line" id="L212"></span>
+<span class="line" id="L213">        {</span>
+<span class="line" id="L214">            <span class="tok-kw">const</span> k = <span class="tok-kw">try</span> english.lookup(<span class="tok-str">&quot;abandon&quot;</span>);</span>
+<span class="line" id="L215">            assert(k == <span class="tok-number">0</span>);</span>
+<span class="line" id="L216">        }</span>
+<span class="line" id="L217">    }</span>
+<span class="line" id="L218">};</span>
+<span class="line" id="L219"></span>
+<span class="line" id="L220"><span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">seedFromMnemonic</span>(mnemonic: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) ![<span class="tok-number">64</span>]<span class="tok-type">u8</span> {</span>
+<span class="line" id="L221">    <span class="tok-kw">var</span> out: [<span class="tok-number">64</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L222">    <span class="tok-kw">try</span> std.crypto.pwhash.pbkdf2(&amp;out, mnemonic, <span class="tok-str">&quot;mnemonic&quot;</span>, <span class="tok-number">2048</span>, std.crypto.auth.hmac.sha2.HmacSha512);</span>
+<span class="line" id="L223">    <span class="tok-kw">return</span> out;</span>
+<span class="line" id="L224">}</span>
+<span class="line" id="L225"></span>
+<span class="line" id="L226"><span class="tok-comment">/// Reads a BIP-39 list from a newline separated string</span></span>
+<span class="line" id="L227"><span class="tok-kw">fn</span> <span class="tok-fn">loadWordList</span>(raw: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) [<span class="tok-number">2048</span>][]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
+<span class="line" id="L228">    <span class="tok-builtin">@setEvalBranchQuota</span>(<span class="tok-number">1024</span> * <span class="tok-number">1024</span>);</span>
+<span class="line" id="L229"></span>
+<span class="line" id="L230">    <span class="tok-kw">var</span> word_list_arr: [<span class="tok-number">2048</span>][]<span class="tok-kw">const</span> <span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L231">    <span class="tok-kw">var</span> buffer = raw;</span>
+<span class="line" id="L232"></span>
+<span class="line" id="L233">    <span class="tok-kw">var</span> i: <span class="tok-type">usize</span> = <span class="tok-number">0</span>;</span>
+<span class="line" id="L234">    <span class="tok-kw">while</span> (<span class="tok-null">true</span>) : (i += <span class="tok-number">1</span>) {</span>
+<span class="line" id="L235">        <span class="tok-kw">var</span> j: <span class="tok-type">usize</span> = <span class="tok-number">0</span>;</span>
+<span class="line" id="L236">        <span class="tok-kw">while</span> (j &lt; buffer.len <span class="tok-kw">and</span> buffer[j] != <span class="tok-str">'\n'</span>) : (j += <span class="tok-number">1</span>) {}</span>
+<span class="line" id="L237">        word_list_arr[i] = buffer[<span class="tok-number">0</span>..j];</span>
+<span class="line" id="L238"></span>
+<span class="line" id="L239">        <span class="tok-kw">if</span> (buffer.len == j) {</span>
+<span class="line" id="L240">            <span class="tok-kw">break</span>;</span>
+<span class="line" id="L241">        }</span>
+<span class="line" id="L242"></span>
+<span class="line" id="L243">        buffer = buffer[j + <span class="tok-number">1</span> ..];</span>
+<span class="line" id="L244">    }</span>
+<span class="line" id="L245"></span>
+<span class="line" id="L246">    <span class="tok-kw">return</span> word_list_arr;</span>
+<span class="line" id="L247">}</span>
+<span class="line" id="L248"></span>
+<span class="line" id="L249"><span class="tok-kw">test</span> <span class="tok-str">&quot;mnemonic&quot;</span> {</span>
+<span class="line" id="L250">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
+<span class="line" id="L251">    <span class="tok-kw">const</span> allocator = std.testing.allocator;</span>
+<span class="line" id="L252">    _ = assert;</span>
+<span class="line" id="L253"></span>
+<span class="line" id="L254">    _ = <span class="tok-kw">try</span> english.decode(<span class="tok-number">24</span>, <span class="tok-str">&quot;rose update response coin cream column wine timber lens repeat short trial mean pear conduct jealous ready negative mind army dance pulse noise capable&quot;</span>);</span>
+<span class="line" id="L255">    _ = <span class="tok-kw">try</span> english.decode(<span class="tok-number">21</span>, <span class="tok-str">&quot;opinion soldier planet cloth swarm polar negative hub will scene maid exotic love chuckle essay casino alcohol bird reward weird intact&quot;</span>);</span>
+<span class="line" id="L256">    _ = <span class="tok-kw">try</span> english.decode(<span class="tok-number">18</span>, <span class="tok-str">&quot;lottery sun canoe enjoy direct early champion dismiss tomorrow strategy scheme shell middle crouch head raven cement bring&quot;</span>);</span>
+<span class="line" id="L257">    _ = <span class="tok-kw">try</span> english.decode(<span class="tok-number">15</span>, <span class="tok-str">&quot;robot need ribbon wink hard dice space immune equal tell castle grant fun absent pond&quot;</span>);</span>
+<span class="line" id="L258">    _ = <span class="tok-kw">try</span> english.decode(<span class="tok-number">12</span>, <span class="tok-str">&quot;cat arch host enforce mixture agent weapon salon praise soldier scout dismiss&quot;</span>);</span>
+<span class="line" id="L259"></span>
+<span class="line" id="L260">    <span class="tok-kw">var</span> entropy = <span class="tok-kw">try</span> english.decodeAlloc(allocator, <span class="tok-str">&quot;cat arch host enforce mixture agent weapon salon praise soldier scout dismiss&quot;</span>);</span>
+<span class="line" id="L261">    allocator.free(entropy);</span>
+<span class="line" id="L262">}</span>
+<span class="line" id="L263"></span>
+</code></pre></body>
+</html>

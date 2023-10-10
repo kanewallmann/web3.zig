@@ -31,3 +31,10 @@ pub fn sha256(input: []const u8) web3.Hash {
     std.crypto.hash.sha2.Sha256.hash(input, output[0..], .{});
     return web3.Hash.wrap(output);
 }
+
+/// Returns the sha3_256 digest of the supplied bytes
+pub fn sha3_256(input: []const u8) web3.Hash {
+    var output: [32]u8 = undefined;
+    std.crypto.hash.sha3.Sha3_256.hash(input, output[0..], .{});
+    return web3.Hash.wrap(output);
+}

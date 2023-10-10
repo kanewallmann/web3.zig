@@ -2461,11 +2461,11 @@
 <span class="line" id="L2255">    <span class="tok-kw">const</span> FnPtr = *<span class="tok-kw">align</span>(<span class="tok-number">1</span>) <span class="tok-kw">const</span> <span class="tok-kw">fn</span> () <span class="tok-type">void</span>;</span>
 <span class="line" id="L2256">    {</span>
 <span class="line" id="L2257">        <span class="tok-kw">const</span> value = <span class="tok-builtin">@as</span>(FnPtr, <span class="tok-builtin">@ptrFromInt</span>(<span class="tok-number">0xdeadbeef</span>));</span>
-<span class="line" id="L2258">        <span class="tok-kw">try</span> expectFmt(<span class="tok-str">&quot;pointer: fn() void@deadbeef\n&quot;</span>, <span class="tok-str">&quot;pointer: {}\n&quot;</span>, .{value});</span>
+<span class="line" id="L2258">        <span class="tok-kw">try</span> expectFmt(<span class="tok-str">&quot;pointer: fn () void@deadbeef\n&quot;</span>, <span class="tok-str">&quot;pointer: {}\n&quot;</span>, .{value});</span>
 <span class="line" id="L2259">    }</span>
 <span class="line" id="L2260">    {</span>
 <span class="line" id="L2261">        <span class="tok-kw">const</span> value = <span class="tok-builtin">@as</span>(FnPtr, <span class="tok-builtin">@ptrFromInt</span>(<span class="tok-number">0xdeadbeef</span>));</span>
-<span class="line" id="L2262">        <span class="tok-kw">try</span> expectFmt(<span class="tok-str">&quot;pointer: fn() void@deadbeef\n&quot;</span>, <span class="tok-str">&quot;pointer: {}\n&quot;</span>, .{value});</span>
+<span class="line" id="L2262">        <span class="tok-kw">try</span> expectFmt(<span class="tok-str">&quot;pointer: fn () void@deadbeef\n&quot;</span>, <span class="tok-str">&quot;pointer: {}\n&quot;</span>, .{value});</span>
 <span class="line" id="L2263">    }</span>
 <span class="line" id="L2264">}</span>
 <span class="line" id="L2265"></span>
@@ -2595,26 +2595,26 @@
 <span class="line" id="L2384">}</span>
 <span class="line" id="L2385"></span>
 <span class="line" id="L2386"><span class="tok-kw">test</span> <span class="tok-str">&quot;float.special&quot;</span> {</span>
-<span class="line" id="L2387">    <span class="tok-kw">try</span> expectFmt(<span class="tok-str">&quot;f64: nan&quot;</span>, <span class="tok-str">&quot;f64: {}&quot;</span>, .{math.nan_f64});</span>
+<span class="line" id="L2387">    <span class="tok-kw">try</span> expectFmt(<span class="tok-str">&quot;f64: nan&quot;</span>, <span class="tok-str">&quot;f64: {}&quot;</span>, .{math.nan(<span class="tok-type">f64</span>)});</span>
 <span class="line" id="L2388">    <span class="tok-comment">// negative nan is not defined by IEE 754,</span>
 </span>
 <span class="line" id="L2389">    <span class="tok-comment">// and ARM thus normalizes it to positive nan</span>
 </span>
 <span class="line" id="L2390">    <span class="tok-kw">if</span> (builtin.target.cpu.arch != .arm) {</span>
-<span class="line" id="L2391">        <span class="tok-kw">try</span> expectFmt(<span class="tok-str">&quot;f64: -nan&quot;</span>, <span class="tok-str">&quot;f64: {}&quot;</span>, .{-math.nan_f64});</span>
+<span class="line" id="L2391">        <span class="tok-kw">try</span> expectFmt(<span class="tok-str">&quot;f64: -nan&quot;</span>, <span class="tok-str">&quot;f64: {}&quot;</span>, .{-math.nan(<span class="tok-type">f64</span>)});</span>
 <span class="line" id="L2392">    }</span>
 <span class="line" id="L2393">    <span class="tok-kw">try</span> expectFmt(<span class="tok-str">&quot;f64: inf&quot;</span>, <span class="tok-str">&quot;f64: {}&quot;</span>, .{math.inf(<span class="tok-type">f64</span>)});</span>
 <span class="line" id="L2394">    <span class="tok-kw">try</span> expectFmt(<span class="tok-str">&quot;f64: -inf&quot;</span>, <span class="tok-str">&quot;f64: {}&quot;</span>, .{-math.inf(<span class="tok-type">f64</span>)});</span>
 <span class="line" id="L2395">}</span>
 <span class="line" id="L2396"></span>
 <span class="line" id="L2397"><span class="tok-kw">test</span> <span class="tok-str">&quot;float.hexadecimal.special&quot;</span> {</span>
-<span class="line" id="L2398">    <span class="tok-kw">try</span> expectFmt(<span class="tok-str">&quot;f64: nan&quot;</span>, <span class="tok-str">&quot;f64: {x}&quot;</span>, .{math.nan_f64});</span>
+<span class="line" id="L2398">    <span class="tok-kw">try</span> expectFmt(<span class="tok-str">&quot;f64: nan&quot;</span>, <span class="tok-str">&quot;f64: {x}&quot;</span>, .{math.nan(<span class="tok-type">f64</span>)});</span>
 <span class="line" id="L2399">    <span class="tok-comment">// negative nan is not defined by IEE 754,</span>
 </span>
 <span class="line" id="L2400">    <span class="tok-comment">// and ARM thus normalizes it to positive nan</span>
 </span>
 <span class="line" id="L2401">    <span class="tok-kw">if</span> (builtin.target.cpu.arch != .arm) {</span>
-<span class="line" id="L2402">        <span class="tok-kw">try</span> expectFmt(<span class="tok-str">&quot;f64: -nan&quot;</span>, <span class="tok-str">&quot;f64: {x}&quot;</span>, .{-math.nan_f64});</span>
+<span class="line" id="L2402">        <span class="tok-kw">try</span> expectFmt(<span class="tok-str">&quot;f64: -nan&quot;</span>, <span class="tok-str">&quot;f64: {x}&quot;</span>, .{-math.nan(<span class="tok-type">f64</span>)});</span>
 <span class="line" id="L2403">    }</span>
 <span class="line" id="L2404">    <span class="tok-kw">try</span> expectFmt(<span class="tok-str">&quot;f64: inf&quot;</span>, <span class="tok-str">&quot;f64: {x}&quot;</span>, .{math.inf(<span class="tok-type">f64</span>)});</span>
 <span class="line" id="L2405">    <span class="tok-kw">try</span> expectFmt(<span class="tok-str">&quot;f64: -inf&quot;</span>, <span class="tok-str">&quot;f64: {x}&quot;</span>, .{-math.inf(<span class="tok-type">f64</span>)});</span>
