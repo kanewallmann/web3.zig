@@ -87,32 +87,41 @@ pub const JsonWriter = struct {
             },
             .Struct => |struct_t| {
                 if (struct_t.is_tuple) {
-                    const field_count = struct_t.fields.len;
                     try writer.writeByte('[');
 
                     var total_size: usize = 2;
 
-                    inline for (struct_t.fields, 0..) |field, i| {
-                        total_size += try write(&@field(arg, field.name), writer);
+                    var first = comptime true;
+                    inline for (struct_t.fields) |field| {
+                        if (@typeInfo(field.type) != .Optional or @field(arg, field.name) != null) {
+                            if (!first) {
+                                try writer.writeByte(',');
+                                total_size += 1;
+                            }
+                            first = false;
 
-                        if (i != field_count - 1) {
-                            try writer.writeByte(',');
-                            total_size += 1;
+                            total_size += try write(&@field(arg, field.name), writer);
                         }
                     }
 
                     try writer.writeByte(']');
                     return total_size;
                 } else {
-                    const field_count = struct_t.fields.len;
                     try writer.writeByte('{');
 
                     var total_size: usize = 2;
 
-                    inline for (struct_t.fields, 0..) |field, i| {
+                    var first = comptime true;
+                    inline for (struct_t.fields) |field| {
                         const val_ptr = &@field(arg, field.name);
 
                         if (@typeInfo(field.type) != .Optional or val_ptr.* != null) {
+                            if (!first) {
+                                try writer.writeByte(',');
+                                total_size += 1;
+                            }
+                            first = false;
+
                             try writer.writeByte('"');
                             const json_def = getJsonDef(T, field.name);
                             total_size += try writer.write(json_def.field_name);
@@ -120,12 +129,7 @@ pub const JsonWriter = struct {
                             _ = try writer.write("\":");
                             total_size += try write(val_ptr, writer);
 
-                            if (i != field_count - 1) {
-                                try writer.writeByte(',');
-                                total_size += 4;
-                            } else {
-                                total_size += 3;
-                            }
+                            total_size += 3;
                         }
                     }
 
