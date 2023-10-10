@@ -100,6 +100,53 @@ This is a list of what has been implemented and what is planned.
 
 MIT - Copyright (c) 2023, Kane Wallmann
 
+## Installation
+
+This library exports a module that can be included in your project via Zig's package manager.
+
+Add it as a dependency to your `build.zig.zon` like so:
+
+```
+...
+    .dependencies = .{
+        .web3 = .{
+            .url = "https://github.com/kanewallmann/web3.zig/archive/refs/heads/master.tar.gz",
+        },
+    },
+...
+```
+
+In your `build.zig` file add the module to your build by adding the lines:
+
+```c
+    const web3 = b.dependency("web3", .{ .target = target, .optimize = optimize });
+    exe.addModule("web3", web3.module("web3"));
+```
+
+Then run `zig build`.
+
+Zig will complain about the hash being incorrect:
+
+```
+note: expected .hash = "12201309cabc8d4c7d5482c7f19754f1f7f779e3cae525a4e6c9ea0e0a824a0bfe69",
+```
+
+Copy that into your `build.zig.zon` file like so:
+
+```
+...
+    .dependencies = .{
+        .web3 = .{
+            .url = "https://github.com/kanewallmann/web3.zig/archive/refs/heads/master.tar.gz",
+            .hash = "12201309cabc8d4c7d5482c7f19754f1f7f779e3cae525a4e6c9ea0e0a824a0bfe69",
+        },
+    },
+...
+```
+
+And then you are ready to `@import("web3")` in your project.
+
+
 ## Examples
 
 There are a few examples under `src/examples`. They can be run with `zig build example_{example_name} -- {rpc_endpoint}` where 
