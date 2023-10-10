@@ -239,8 +239,7 @@ pub const JsonRpcProvider = struct {
     /// eth_chainId
     pub fn getChainId(self: *Self) !u32 {
         const params = web3.EmptyArray{};
-        const hex_data = try self.send("eth_chainId", params, web3.IntHexString(u32));
-        return hex_data.raw;
+        return self.send("eth_chainId", params, u32);
     }
 
     /// eth_mining
@@ -252,15 +251,13 @@ pub const JsonRpcProvider = struct {
     /// eth_hashrate
     pub fn getHashrate(self: *Self) !u32 {
         const params = web3.EmptyArray{};
-        const hex_data = try self.send("eth_hashrate", params, web3.IntHexString(u32));
-        return hex_data.raw;
+        return self.send("eth_hashrate", params, u32);
     }
 
     /// eth_gasPrice
     pub fn getGasPrice(self: *Self) !u256 {
         const params = web3.EmptyArray{};
-        const hex_data = try self.send("eth_gasPrice", params, web3.IntHexString(u256));
-        return hex_data.raw;
+        return self.send("eth_gasPrice", params, u256);
     }
 
     /// eth_accounts
@@ -283,8 +280,7 @@ pub const JsonRpcProvider = struct {
 
     /// eth_getStorageAt
     pub fn getStorageAt(self: *Self, addr: web3.Address, slot: u256, block_tag: ?web3.BlockTag) ![]const u8 {
-        const hex_slot = web3.IntHexString(u256).wrap(slot);
-        const params = .{ addr, hex_slot, self.blockTagToString(block_tag) };
+        const params = .{ addr, slot, self.blockTagToString(block_tag) };
         const hex_data = try self.send("eth_getStorageAt", params, web3.DataHexString);
         return hex_data.raw;
     }
@@ -298,29 +294,25 @@ pub const JsonRpcProvider = struct {
     /// eth_getBlockTransactionCountByHash
     pub fn getBlockTransactionCountByHash(self: *Self, block_hash: web3.Hash) !u32 {
         const params = .{block_hash};
-        const hex_data = try self.send("eth_getBlockTransactionCountByHash", params, web3.IntHexString(u32));
-        return hex_data.raw;
+        return self.send("eth_getBlockTransactionCountByHash", params, u32);
     }
 
     /// eth_getBlockTransactionCountByNumber
     pub fn getBlockTransactionCountByNumber(self: *Self, block_tag: ?web3.BlockTag) !u32 {
         const params = .{self.blockTagToString(block_tag)};
-        const hex_data = try self.send("eth_getBlockTransactionCountByNumber", params, web3.IntHexString(u32));
-        return hex_data.raw;
+        return self.send("eth_getBlockTransactionCountByNumber", params, u32);
     }
 
     /// eth_getUncleCountByBlockHash
     pub fn getUncleCountByBlockHash(self: *Self, block_hash: web3.Hash) !u32 {
         const params = .{block_hash};
-        const hex_data = try self.send("eth_getUncleCountByBlockHash", params, web3.IntHexString(u32));
-        return hex_data.raw;
+        return try self.send("eth_getUncleCountByBlockHash", params, u32);
     }
 
     /// eth_getUncleCountByBlockNumber
     pub fn getUncleCountByBlockNumber(self: *Self, block_tag: ?web3.BlockTag) !u32 {
         const params = .{self.blockTagToString(block_tag)};
-        const hex_data = try self.send("eth_getUncleCountByBlockNumber", params, web3.IntHexString(u32));
-        return hex_data.raw;
+        return try self.send("eth_getUncleCountByBlockNumber", params, u32);
     }
 
     /// eth_getCode
@@ -376,8 +368,7 @@ pub const JsonRpcProvider = struct {
     pub fn estimateGas(self: *Self, tx: web3.TransactionRequest) !u256 {
         var json_tx: *const web3.TransactionRequest = @ptrCast(&tx);
         const params = .{json_tx};
-        const hex_data = try self.send("eth_estimateGas", params, web3.IntHexString(u256));
-        return hex_data.raw;
+        return self.send("eth_estimateGas", params, u256);
     }
 
     /// eth_getBlockByHash
@@ -402,13 +393,13 @@ pub const JsonRpcProvider = struct {
 
     /// eth_getTransactionByBlockHashAndIndex
     pub fn getTransactionByBlockHashAndIndex(self: *Self, block_hash: web3.Hash, index: u32) !web3.Transaction {
-        const params = .{ block_hash, web3.IntHexString(u32).wrap(index) };
+        const params = .{ block_hash, index };
         return self.send("eth_getTransactionByBlockHashAndIndex", params, web3.Transaction);
     }
 
     /// eth_getTransactionByBlockNumberAndIndex
     pub fn getTransactionByBlockNumberAndIndex(self: *Self, block_tag: ?web3.BlockTag, index: u32) !web3.Transaction {
-        const params = .{ self.blockTagToString(block_tag), web3.IntHexString(u32).wrap(index) };
+        const params = .{ self.blockTagToString(block_tag), index };
         return self.send("eth_getTransactionByBlockNumberAndIndex", params, web3.Transaction);
     }
 
@@ -420,13 +411,13 @@ pub const JsonRpcProvider = struct {
 
     /// eth_getUncleByBlockHashAndIndex
     pub fn getUngleByBlockHashAndIndex(self: *Self, block_hash: web3.Hash, index: u32) !web3.Block(false) {
-        const params = .{ block_hash, web3.IntHexString(u32).wrap(index) };
+        const params = .{ block_hash, index };
         return self.send("eth_getUncleByBlockHashAndIndex", params, web3.Block(false));
     }
 
     /// eth_getUncleByBlockNumberAndIndex
     pub fn getUngleByBlockNumberAndIndex(self: *Self, block_tag: ?web3.BlockTag, index: u32) !web3.Block(false) {
-        const params = .{ self.blockTagToString(block_tag), web3.IntHexString(u32).wrap(index) };
+        const params = .{ self.blockTagToString(block_tag), index };
         return self.send("eth_getUncleByBlockHashAndIndex", params, web3.Block(false));
     }
 
@@ -446,21 +437,21 @@ pub const JsonRpcProvider = struct {
     }
 
     /// eth_feeHistory
-    pub fn getFeeHistory(self: *Self, block_count: u16, newest_block: ?web3.BlockTag, reward_percentiles: ?[]const u8) !JsonFeeHistory {
-        const params = .{ web3.IntHexString(u16).wrap(block_count), self.blockTagToString(newest_block), reward_percentiles };
+    pub fn getFeeHistory(self: *Self, block_count: u16, newest_block: ?web3.BlockTag, reward_percentiles: ?[]const f64) !JsonFeeHistory {
+        const params = .{ block_count, self.blockTagToString(newest_block), reward_percentiles };
         return self.send("eth_feeHistory", params, JsonFeeHistory);
     }
 
     /// Estimates values for max_fee_per_gas and max_priority_fee_per_gas.
     /// Looks at the past 4 blocks and averages the reward paid by a percentile of transactions controlled by the given speed.
     pub fn getFeeEstimate(self: *Self, speed: web3.FeeEstimateSpeed) !web3.FeeEstimate {
-        const percentile: u8 = switch (speed) {
+        const percentile: f64 = switch (speed) {
             .low => 20,
             .average => 50,
             .high => 90,
         };
 
-        const percentiles: [1]u8 = .{percentile};
+        const percentiles: [1]f64 = .{percentile};
         const fee_history = try self.getFeeHistory(4, .{ .tag = .pending }, &percentiles);
         defer fee_history.deinit(self.allocator);
 

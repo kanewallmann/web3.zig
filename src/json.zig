@@ -50,10 +50,7 @@ pub const JsonWriter = struct {
 
         switch (TI) {
             .Int, .ComptimeInt => {
-                var buffer: [78]u8 = undefined;
-                var fbs = std.io.fixedBufferStream(&buffer);
-                try std.fmt.formatInt(arg, 10, .lower, .{}, fbs.writer());
-                return writer.write(buffer[0..fbs.pos]);
+                return writeHexInt(arg, writer);
             },
             .Float, .ComptimeFloat => {
                 var buffer: [78]u8 = undefined;
