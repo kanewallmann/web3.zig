@@ -29,6 +29,7 @@ This is a list of what has been implemented and what is planned.
 | eth_gasPrice                            | ✅                    |
 | eth_accounts                            | ✅                    |
 | eth_blockNumber                         | ✅                    |
+| eth_feeHistory                          | ✅                    |
 | eth_getBalance                          | ✅                    |
 | eth_getStorageAt                        | ✅                    |
 | eth_getTransactionCount                 | ✅                    |
@@ -91,7 +92,8 @@ This is a list of what has been implemented and what is planned.
 - ✅ Local account features (signing transactions, HD wallets, etc.)
 - ❌ Log and transaction filters
 - ❌ Abstracted contract deployment
-- ❌ RLP encoding/decoding (and by extension transaction encoding/decoding)
+- ✅ RLP/transaction encoding
+- ❌ RLP decoding
 - ❌ Native ENS support
 - ❌ Documentation
 - ❌ Comprehensive tests
