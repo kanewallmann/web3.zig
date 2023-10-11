@@ -179,320 +179,318 @@
 <span class="line" id="L66"></span>
 <span class="line" id="L67">        <span class="tok-kw">var</span> counter: <span class="tok-type">usize</span> = <span class="tok-number">0</span>;</span>
 <span class="line" id="L68">        <span class="tok-kw">while</span> (<span class="tok-null">true</span>) : (counter += <span class="tok-number">1</span>) {</span>
-<span class="line" id="L69">            <span class="tok-comment">// Calculate secret value k from [1,n-1]</span>
+<span class="line" id="L69">            <span class="tok-kw">var</span> k_bytes = self.generateNonce(message, counter);</span>
+<span class="line" id="L70">            <span class="tok-kw">var</span> k = <span class="tok-kw">try</span> curve.scalar.Scalar.fromBytes(k_bytes, .Big);</span>
+<span class="line" id="L71"></span>
+<span class="line" id="L72">            <span class="tok-comment">// Compute curve point</span>
 </span>
-<span class="line" id="L70">            <span class="tok-kw">var</span> k_bytes = self.generateNonce(message, counter);</span>
-<span class="line" id="L71">            <span class="tok-kw">var</span> k = <span class="tok-kw">try</span> curve.scalar.Scalar.fromBytes(k_bytes, .Big);</span>
-<span class="line" id="L72"></span>
-<span class="line" id="L73">            <span class="tok-comment">// Compute curve point</span>
+<span class="line" id="L73">            <span class="tok-kw">const</span> p1 = (curve.basePoint.mul(k.toBytes(.Little), .Little) <span class="tok-kw">catch</span> <span class="tok-kw">continue</span>).affineCoordinates();</span>
+<span class="line" id="L74">            r = curve.scalar.Scalar.fromBytes(p1.x.toBytes(.Little), .Little) <span class="tok-kw">catch</span> <span class="tok-kw">unreachable</span>;</span>
+<span class="line" id="L75">            <span class="tok-kw">if</span> (r.isZero()) {</span>
+<span class="line" id="L76">                <span class="tok-kw">continue</span>;</span>
+<span class="line" id="L77">            }</span>
+<span class="line" id="L78"></span>
+<span class="line" id="L79">            y_parity = p1.y.isOdd();</span>
+<span class="line" id="L80"></span>
+<span class="line" id="L81">            <span class="tok-comment">// Compute s value (s = k^-1(z + r * d_a))</span>
 </span>
-<span class="line" id="L74">            <span class="tok-kw">const</span> p1 = (curve.basePoint.mul(k.toBytes(.Little), .Little) <span class="tok-kw">catch</span> <span class="tok-kw">continue</span>).affineCoordinates();</span>
-<span class="line" id="L75">            r = curve.scalar.Scalar.fromBytes(p1.x.toBytes(.Little), .Little) <span class="tok-kw">catch</span> <span class="tok-kw">unreachable</span>;</span>
-<span class="line" id="L76">            <span class="tok-kw">if</span> (r.isZero()) {</span>
-<span class="line" id="L77">                <span class="tok-kw">continue</span>;</span>
-<span class="line" id="L78">            }</span>
-<span class="line" id="L79"></span>
-<span class="line" id="L80">            y_parity = p1.y.isOdd();</span>
-<span class="line" id="L81"></span>
-<span class="line" id="L82">            <span class="tok-comment">// Compute s value (s = k^-1(z + r * d_a))</span>
+<span class="line" id="L82">            <span class="tok-kw">const</span> kinv = k.invert();</span>
+<span class="line" id="L83">            s = kinv.mul(z.add(da.mul(r)));</span>
+<span class="line" id="L84"></span>
+<span class="line" id="L85">            <span class="tok-comment">// Check if signature is valid</span>
 </span>
-<span class="line" id="L83">            <span class="tok-kw">const</span> kinv = k.invert();</span>
-<span class="line" id="L84">            s = kinv.mul(z.add(da.mul(r)));</span>
-<span class="line" id="L85"></span>
-<span class="line" id="L86">            <span class="tok-comment">// Check if signature is valid</span>
+<span class="line" id="L86">            <span class="tok-kw">if</span> (!s.isZero()) {</span>
+<span class="line" id="L87">                <span class="tok-kw">break</span>;</span>
+<span class="line" id="L88">            }</span>
+<span class="line" id="L89">        }</span>
+<span class="line" id="L90"></span>
+<span class="line" id="L91">        <span class="tok-comment">// Encode into VRS format</span>
 </span>
-<span class="line" id="L87">            <span class="tok-kw">if</span> (!s.isZero()) {</span>
-<span class="line" id="L88">                <span class="tok-kw">break</span>;</span>
-<span class="line" id="L89">            }</span>
-<span class="line" id="L90">        }</span>
-<span class="line" id="L91"></span>
-<span class="line" id="L92">        <span class="tok-comment">// Encode into VRS format</span>
+<span class="line" id="L92">        <span class="tok-kw">var</span> signature: Signature = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L93"></span>
+<span class="line" id="L94">        <span class="tok-kw">var</span> bytes = r.toBytes(native_endian);</span>
+<span class="line" id="L95">        signature.r = std.mem.readIntNative(<span class="tok-type">u256</span>, &amp;bytes);</span>
+<span class="line" id="L96"></span>
+<span class="line" id="L97">        bytes = s.toBytes(native_endian);</span>
+<span class="line" id="L98">        signature.s = std.mem.readIntNative(<span class="tok-type">u256</span>, &amp;bytes);</span>
+<span class="line" id="L99"></span>
+<span class="line" id="L100">        signature.v = <span class="tok-builtin">@as</span>(<span class="tok-type">u256</span>, <span class="tok-kw">if</span> (y_parity) <span class="tok-number">1</span> <span class="tok-kw">else</span> <span class="tok-number">0</span>);</span>
+<span class="line" id="L101"></span>
+<span class="line" id="L102">        <span class="tok-kw">return</span> signature;</span>
+<span class="line" id="L103">    }</span>
+<span class="line" id="L104"></span>
+<span class="line" id="L105">    <span class="tok-comment">/// Generates a deterministic k value per RFC 6979 for deterministic signature generation.</span></span>
+<span class="line" id="L106">    <span class="tok-comment">/// counter can be incremented if the output k results in an invalid signature to try the next possible k.</span></span>
+<span class="line" id="L107">    <span class="tok-kw">fn</span> <span class="tok-fn">generateNonce</span>(self: Self, message: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, counter: <span class="tok-type">usize</span>) [<span class="tok-number">32</span>]<span class="tok-type">u8</span> {</span>
+<span class="line" id="L108">        <span class="tok-kw">const</span> hmac = std.crypto.auth.hmac.sha2.HmacSha256;</span>
+<span class="line" id="L109"></span>
+<span class="line" id="L110">        <span class="tok-comment">// 3.2.a</span>
 </span>
-<span class="line" id="L93">        <span class="tok-kw">var</span> signature: Signature = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L94"></span>
-<span class="line" id="L95">        <span class="tok-kw">var</span> bytes = r.toBytes(native_endian);</span>
-<span class="line" id="L96">        signature.r = std.mem.readIntNative(<span class="tok-type">u256</span>, &amp;bytes);</span>
-<span class="line" id="L97"></span>
-<span class="line" id="L98">        bytes = s.toBytes(native_endian);</span>
-<span class="line" id="L99">        signature.s = std.mem.readIntNative(<span class="tok-type">u256</span>, &amp;bytes);</span>
-<span class="line" id="L100"></span>
-<span class="line" id="L101">        signature.v = <span class="tok-builtin">@as</span>(<span class="tok-type">u256</span>, <span class="tok-kw">if</span> (y_parity) <span class="tok-number">1</span> <span class="tok-kw">else</span> <span class="tok-number">0</span>);</span>
-<span class="line" id="L102"></span>
-<span class="line" id="L103">        <span class="tok-kw">return</span> signature;</span>
-<span class="line" id="L104">    }</span>
-<span class="line" id="L105"></span>
-<span class="line" id="L106">    <span class="tok-comment">/// Generates a deterministic k value per RFC 6979 for deterministic signature generation.</span></span>
-<span class="line" id="L107">    <span class="tok-comment">/// counter can be incremented if the output k results in an invalid signature to try the next possible k.</span></span>
-<span class="line" id="L108">    <span class="tok-kw">fn</span> <span class="tok-fn">generateNonce</span>(self: Self, message: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, counter: <span class="tok-type">usize</span>) [<span class="tok-number">32</span>]<span class="tok-type">u8</span> {</span>
-<span class="line" id="L109">        <span class="tok-kw">const</span> hmac = std.crypto.auth.hmac.sha2.HmacSha256;</span>
-<span class="line" id="L110"></span>
-<span class="line" id="L111">        <span class="tok-comment">// 3.2.a</span>
+<span class="line" id="L111">        <span class="tok-kw">var</span> h1: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L112">        std.crypto.hash.sha3.Keccak256.hash(message, &amp;h1, .{});</span>
+<span class="line" id="L113"></span>
+<span class="line" id="L114">        <span class="tok-kw">var</span> v: [<span class="tok-number">33</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L115">        <span class="tok-kw">var</span> k: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L116">        <span class="tok-kw">var</span> input: [<span class="tok-number">97</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L117"></span>
+<span class="line" id="L118">        <span class="tok-comment">// 3.2.b</span>
 </span>
-<span class="line" id="L112">        <span class="tok-kw">var</span> h1: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L113">        std.crypto.hash.sha3.Keccak256.hash(message, &amp;h1, .{});</span>
-<span class="line" id="L114"></span>
-<span class="line" id="L115">        <span class="tok-kw">var</span> v: [<span class="tok-number">33</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L116">        <span class="tok-kw">var</span> k: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L117">        <span class="tok-kw">var</span> input: [<span class="tok-number">97</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L118"></span>
-<span class="line" id="L119">        <span class="tok-comment">// 3.2.b</span>
+<span class="line" id="L119">        <span class="tok-builtin">@memset</span>(v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], <span class="tok-number">0x01</span>);</span>
+<span class="line" id="L120">        v[<span class="tok-number">32</span>] = <span class="tok-number">0</span>;</span>
+<span class="line" id="L121"></span>
+<span class="line" id="L122">        <span class="tok-comment">// 3.2.c</span>
 </span>
-<span class="line" id="L120">        <span class="tok-builtin">@memset</span>(v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], <span class="tok-number">0x01</span>);</span>
-<span class="line" id="L121">        v[<span class="tok-number">32</span>] = <span class="tok-number">0</span>;</span>
-<span class="line" id="L122"></span>
-<span class="line" id="L123">        <span class="tok-comment">// 3.2.c</span>
+<span class="line" id="L123">        <span class="tok-builtin">@memset</span>(&amp;k, <span class="tok-number">0x00</span>);</span>
+<span class="line" id="L124"></span>
+<span class="line" id="L125">        <span class="tok-comment">// 3.2.d</span>
 </span>
-<span class="line" id="L124">        <span class="tok-builtin">@memset</span>(&amp;k, <span class="tok-number">0x00</span>);</span>
-<span class="line" id="L125"></span>
-<span class="line" id="L126">        <span class="tok-comment">// 3.2.d</span>
+<span class="line" id="L126">        <span class="tok-builtin">@memcpy</span>(input[<span class="tok-number">0</span>..<span class="tok-number">32</span>], v[<span class="tok-number">0</span>..<span class="tok-number">32</span>]);</span>
+<span class="line" id="L127">        input[<span class="tok-number">32</span>] = <span class="tok-number">0x00</span>;</span>
+<span class="line" id="L128">        <span class="tok-builtin">@memcpy</span>(input[<span class="tok-number">33</span>..<span class="tok-number">65</span>], &amp;self.privkey);</span>
+<span class="line" id="L129">        <span class="tok-builtin">@memcpy</span>(input[<span class="tok-number">65</span>..<span class="tok-number">97</span>], &amp;h1);</span>
+<span class="line" id="L130">        hmac.create(&amp;k, &amp;input, &amp;k);</span>
+<span class="line" id="L131"></span>
+<span class="line" id="L132">        <span class="tok-comment">// 3.2.e</span>
 </span>
-<span class="line" id="L127">        <span class="tok-builtin">@memcpy</span>(input[<span class="tok-number">0</span>..<span class="tok-number">32</span>], v[<span class="tok-number">0</span>..<span class="tok-number">32</span>]);</span>
-<span class="line" id="L128">        input[<span class="tok-number">32</span>] = <span class="tok-number">0x00</span>;</span>
-<span class="line" id="L129">        <span class="tok-builtin">@memcpy</span>(input[<span class="tok-number">33</span>..<span class="tok-number">65</span>], &amp;self.privkey);</span>
-<span class="line" id="L130">        <span class="tok-builtin">@memcpy</span>(input[<span class="tok-number">65</span>..<span class="tok-number">97</span>], &amp;h1);</span>
-<span class="line" id="L131">        hmac.create(&amp;k, &amp;input, &amp;k);</span>
-<span class="line" id="L132"></span>
-<span class="line" id="L133">        <span class="tok-comment">// 3.2.e</span>
+<span class="line" id="L133">        hmac.create(v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], &amp;k);</span>
+<span class="line" id="L134"></span>
+<span class="line" id="L135">        <span class="tok-comment">// 3.2.f</span>
 </span>
-<span class="line" id="L134">        hmac.create(v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], &amp;k);</span>
-<span class="line" id="L135"></span>
-<span class="line" id="L136">        <span class="tok-comment">// 3.2.f</span>
+<span class="line" id="L136">        <span class="tok-builtin">@memcpy</span>(input[<span class="tok-number">0</span>..<span class="tok-number">32</span>], v[<span class="tok-number">0</span>..<span class="tok-number">32</span>]);</span>
+<span class="line" id="L137">        input[<span class="tok-number">32</span>] = <span class="tok-number">0x01</span>;</span>
+<span class="line" id="L138">        <span class="tok-builtin">@memcpy</span>(input[<span class="tok-number">33</span>..<span class="tok-number">65</span>], &amp;self.privkey);</span>
+<span class="line" id="L139">        <span class="tok-builtin">@memcpy</span>(input[<span class="tok-number">65</span>..<span class="tok-number">97</span>], &amp;h1);</span>
+<span class="line" id="L140">        hmac.create(&amp;k, &amp;input, &amp;k);</span>
+<span class="line" id="L141"></span>
+<span class="line" id="L142">        <span class="tok-comment">// 3.2.g</span>
 </span>
-<span class="line" id="L137">        <span class="tok-builtin">@memcpy</span>(input[<span class="tok-number">0</span>..<span class="tok-number">32</span>], v[<span class="tok-number">0</span>..<span class="tok-number">32</span>]);</span>
-<span class="line" id="L138">        input[<span class="tok-number">32</span>] = <span class="tok-number">0x01</span>;</span>
-<span class="line" id="L139">        <span class="tok-builtin">@memcpy</span>(input[<span class="tok-number">33</span>..<span class="tok-number">65</span>], &amp;self.privkey);</span>
-<span class="line" id="L140">        <span class="tok-builtin">@memcpy</span>(input[<span class="tok-number">65</span>..<span class="tok-number">97</span>], &amp;h1);</span>
-<span class="line" id="L141">        hmac.create(&amp;k, &amp;input, &amp;k);</span>
-<span class="line" id="L142"></span>
-<span class="line" id="L143">        <span class="tok-comment">// 3.2.g</span>
+<span class="line" id="L143">        hmac.create(v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], &amp;k);</span>
+<span class="line" id="L144"></span>
+<span class="line" id="L145">        <span class="tok-comment">// 3.2.h</span>
 </span>
-<span class="line" id="L144">        hmac.create(v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], &amp;k);</span>
-<span class="line" id="L145"></span>
-<span class="line" id="L146">        <span class="tok-comment">// 3.2.h</span>
+<span class="line" id="L146">        hmac.create(v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], &amp;k);</span>
+<span class="line" id="L147"></span>
+<span class="line" id="L148">        <span class="tok-kw">var</span> i: <span class="tok-type">usize</span> = <span class="tok-number">0</span>;</span>
+<span class="line" id="L149">        <span class="tok-kw">while</span> (<span class="tok-null">true</span>) : (i += <span class="tok-number">1</span>) {</span>
+<span class="line" id="L150">            <span class="tok-kw">const</span> k_int = std.mem.readIntBig(<span class="tok-type">u256</span>, v[<span class="tok-number">0</span>..<span class="tok-number">32</span>]);</span>
+<span class="line" id="L151"></span>
+<span class="line" id="L152">            <span class="tok-kw">if</span> (i &gt;= counter <span class="tok-kw">and</span> k_int &gt; <span class="tok-number">0</span> <span class="tok-kw">and</span> k_int &lt; curve.scalar.field_order) {</span>
+<span class="line" id="L153">                <span class="tok-kw">break</span>;</span>
+<span class="line" id="L154">            }</span>
+<span class="line" id="L155"></span>
+<span class="line" id="L156">            hmac.create(&amp;k, v[<span class="tok-number">0</span>..<span class="tok-number">33</span>], &amp;k);</span>
+<span class="line" id="L157">            hmac.create(v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], &amp;k);</span>
+<span class="line" id="L158">        }</span>
+<span class="line" id="L159"></span>
+<span class="line" id="L160">        <span class="tok-kw">return</span> v[<span class="tok-number">0</span>..<span class="tok-number">32</span>].*;</span>
+<span class="line" id="L161">    }</span>
+<span class="line" id="L162">};</span>
+<span class="line" id="L163"></span>
+<span class="line" id="L164"><span class="tok-comment">/// Represents an ECDSA signature on the Secp256k1 curve in the VRS format Ethereum uses</span></span>
+<span class="line" id="L165"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> Signature = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L166">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L167"></span>
+<span class="line" id="L168">    v: <span class="tok-type">u256</span>, <span class="tok-comment">// Recovery ID</span>
 </span>
-<span class="line" id="L147">        hmac.create(v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], &amp;k);</span>
-<span class="line" id="L148"></span>
-<span class="line" id="L149">        <span class="tok-kw">var</span> i: <span class="tok-type">usize</span> = <span class="tok-number">0</span>;</span>
-<span class="line" id="L150">        <span class="tok-kw">while</span> (<span class="tok-null">true</span>) : (i += <span class="tok-number">1</span>) {</span>
-<span class="line" id="L151">            <span class="tok-kw">const</span> k_int = std.mem.readIntBig(<span class="tok-type">u256</span>, v[<span class="tok-number">0</span>..<span class="tok-number">32</span>]);</span>
-<span class="line" id="L152"></span>
-<span class="line" id="L153">            <span class="tok-kw">if</span> (i &gt;= counter <span class="tok-kw">and</span> k_int &gt; <span class="tok-number">0</span> <span class="tok-kw">and</span> k_int &lt; curve.scalar.field_order) {</span>
-<span class="line" id="L154">                <span class="tok-kw">break</span>;</span>
-<span class="line" id="L155">            }</span>
-<span class="line" id="L156"></span>
-<span class="line" id="L157">            hmac.create(&amp;k, v[<span class="tok-number">0</span>..<span class="tok-number">33</span>], &amp;k);</span>
-<span class="line" id="L158">            hmac.create(v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], v[<span class="tok-number">0</span>..<span class="tok-number">32</span>], &amp;k);</span>
-<span class="line" id="L159">        }</span>
-<span class="line" id="L160"></span>
-<span class="line" id="L161">        <span class="tok-kw">return</span> v[<span class="tok-number">0</span>..<span class="tok-number">32</span>].*;</span>
-<span class="line" id="L162">    }</span>
-<span class="line" id="L163">};</span>
-<span class="line" id="L164"></span>
-<span class="line" id="L165"><span class="tok-comment">/// Represents an ECDSA signature on the Secp256k1 curve in the VRS format Ethereum uses</span></span>
-<span class="line" id="L166"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> Signature = <span class="tok-kw">struct</span> {</span>
-<span class="line" id="L167">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
-<span class="line" id="L168"></span>
-<span class="line" id="L169">    v: <span class="tok-type">u256</span>, <span class="tok-comment">// Recovery ID</span>
+<span class="line" id="L169">    r: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L170">    s: <span class="tok-type">u256</span>,</span>
+<span class="line" id="L171"></span>
+<span class="line" id="L172">    <span class="tok-comment">/// Updates the v value of this signature to encode the chain id per EIP-155</span></span>
+<span class="line" id="L173">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">addChainId</span>(self: *Self, chain_id: <span class="tok-type">u256</span>) !<span class="tok-type">void</span> {</span>
+<span class="line" id="L174">        <span class="tok-kw">if</span> (self.v &gt; <span class="tok-number">1</span>) {</span>
+<span class="line" id="L175">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.UnexpectedParity;</span>
+<span class="line" id="L176">        }</span>
+<span class="line" id="L177"></span>
+<span class="line" id="L178">        self.v += (<span class="tok-number">2</span> * chain_id) + <span class="tok-number">35</span>;</span>
+<span class="line" id="L179">    }</span>
+<span class="line" id="L180"></span>
+<span class="line" id="L181">    <span class="tok-comment">/// Recovers the chain id encoded in the v value per EIP-155 (or zero if not an EIP-155 signature)</span></span>
+<span class="line" id="L182">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getChainId</span>(self: Self) <span class="tok-type">u256</span> {</span>
+<span class="line" id="L183">        <span class="tok-kw">if</span> (self.v &gt; <span class="tok-number">35</span>) {</span>
+<span class="line" id="L184">            <span class="tok-kw">var</span> v = self.v - <span class="tok-number">35</span>;</span>
+<span class="line" id="L185">            v -= <span class="tok-builtin">@rem</span>(v, <span class="tok-number">2</span>);</span>
+<span class="line" id="L186">            <span class="tok-kw">return</span> v / <span class="tok-number">2</span>;</span>
+<span class="line" id="L187">        }</span>
+<span class="line" id="L188">        <span class="tok-kw">return</span> <span class="tok-number">0</span>;</span>
+<span class="line" id="L189">    }</span>
+<span class="line" id="L190"></span>
+<span class="line" id="L191">    <span class="tok-comment">/// Verifies that the given signature is valid for the given message and pubkey.</span></span>
+<span class="line" id="L192">    <span class="tok-comment">/// Public key can be either compressed or uncompressed SEC1 encoded.</span></span>
+<span class="line" id="L193">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">verify</span>(self: Self, pubkey: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, message: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !<span class="tok-type">bool</span> {</span>
+<span class="line" id="L194">        <span class="tok-comment">// Reconstruct r and s field elements</span>
 </span>
-<span class="line" id="L170">    r: <span class="tok-type">u256</span>,</span>
-<span class="line" id="L171">    s: <span class="tok-type">u256</span>,</span>
-<span class="line" id="L172"></span>
-<span class="line" id="L173">    <span class="tok-comment">/// Updates the v value of this signature to encode the chain id per EIP-155</span></span>
-<span class="line" id="L174">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">addChainId</span>(self: *Self, chain_id: <span class="tok-type">u256</span>) !<span class="tok-type">void</span> {</span>
-<span class="line" id="L175">        <span class="tok-kw">if</span> (self.v &gt; <span class="tok-number">1</span>) {</span>
-<span class="line" id="L176">            <span class="tok-kw">return</span> <span class="tok-kw">error</span>.UnexpectedParity;</span>
-<span class="line" id="L177">        }</span>
-<span class="line" id="L178"></span>
-<span class="line" id="L179">        self.v += (<span class="tok-number">2</span> * chain_id) + <span class="tok-number">35</span>;</span>
-<span class="line" id="L180">    }</span>
-<span class="line" id="L181"></span>
-<span class="line" id="L182">    <span class="tok-comment">/// Recovers the chain id encoded in the v value per EIP-155 (or zero if not an EIP-155 signature)</span></span>
-<span class="line" id="L183">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">getChainId</span>(self: Self) <span class="tok-type">u256</span> {</span>
-<span class="line" id="L184">        <span class="tok-kw">if</span> (self.v &gt; <span class="tok-number">35</span>) {</span>
-<span class="line" id="L185">            <span class="tok-kw">var</span> v = self.v - <span class="tok-number">35</span>;</span>
-<span class="line" id="L186">            v -= <span class="tok-builtin">@rem</span>(v, <span class="tok-number">2</span>);</span>
-<span class="line" id="L187">            <span class="tok-kw">return</span> v / <span class="tok-number">2</span>;</span>
-<span class="line" id="L188">        }</span>
-<span class="line" id="L189">        <span class="tok-kw">return</span> <span class="tok-number">0</span>;</span>
-<span class="line" id="L190">    }</span>
-<span class="line" id="L191"></span>
-<span class="line" id="L192">    <span class="tok-comment">/// Verifies that the given signature is valid for the given message and pubkey.</span></span>
-<span class="line" id="L193">    <span class="tok-comment">/// Public key can be either compressed or uncompressed SEC1 encoded.</span></span>
-<span class="line" id="L194">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">verify</span>(self: Self, pubkey: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, message: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !<span class="tok-type">bool</span> {</span>
-<span class="line" id="L195">        <span class="tok-comment">// Reconstruct r and s field elements</span>
+<span class="line" id="L195">        <span class="tok-kw">var</span> r_bytes: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L196">        std.mem.writeIntLittle(<span class="tok-type">u256</span>, &amp;r_bytes, self.r);</span>
+<span class="line" id="L197">        <span class="tok-kw">var</span> r = curve.scalar.Scalar.fromBytes(r_bytes, .Little) <span class="tok-kw">catch</span> <span class="tok-kw">return</span> <span class="tok-null">false</span>;</span>
+<span class="line" id="L198"></span>
+<span class="line" id="L199">        <span class="tok-kw">var</span> s_bytes: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L200">        std.mem.writeIntLittle(<span class="tok-type">u256</span>, &amp;s_bytes, self.s);</span>
+<span class="line" id="L201">        <span class="tok-kw">var</span> s = curve.scalar.Scalar.fromBytes(s_bytes, .Little) <span class="tok-kw">catch</span> <span class="tok-kw">return</span> <span class="tok-null">false</span>;</span>
+<span class="line" id="L202"></span>
+<span class="line" id="L203">        <span class="tok-comment">// Hash message</span>
 </span>
-<span class="line" id="L196">        <span class="tok-kw">var</span> r_bytes: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L197">        std.mem.writeIntLittle(<span class="tok-type">u256</span>, &amp;r_bytes, self.r);</span>
-<span class="line" id="L198">        <span class="tok-kw">var</span> r = curve.scalar.Scalar.fromBytes(r_bytes, .Little) <span class="tok-kw">catch</span> <span class="tok-kw">return</span> <span class="tok-null">false</span>;</span>
-<span class="line" id="L199"></span>
-<span class="line" id="L200">        <span class="tok-kw">var</span> s_bytes: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L201">        std.mem.writeIntLittle(<span class="tok-type">u256</span>, &amp;s_bytes, self.s);</span>
-<span class="line" id="L202">        <span class="tok-kw">var</span> s = curve.scalar.Scalar.fromBytes(s_bytes, .Little) <span class="tok-kw">catch</span> <span class="tok-kw">return</span> <span class="tok-null">false</span>;</span>
-<span class="line" id="L203"></span>
-<span class="line" id="L204">        <span class="tok-comment">// Hash message</span>
+<span class="line" id="L204">        <span class="tok-kw">var</span> hash: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L205">        std.crypto.hash.sha3.Keccak256.hash(message, &amp;hash, .{});</span>
+<span class="line" id="L206">        <span class="tok-kw">const</span> z = hashToScalar(hash);</span>
+<span class="line" id="L207"></span>
+<span class="line" id="L208">        <span class="tok-comment">// Compute u1 and u2</span>
 </span>
-<span class="line" id="L205">        <span class="tok-kw">var</span> hash: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L206">        std.crypto.hash.sha3.Keccak256.hash(message, &amp;hash, .{});</span>
-<span class="line" id="L207">        <span class="tok-kw">const</span> z = hashToScalar(hash);</span>
-<span class="line" id="L208"></span>
-<span class="line" id="L209">        <span class="tok-comment">// Compute u1 and u2</span>
+<span class="line" id="L209">        <span class="tok-kw">const</span> sinv = s.invert();</span>
+<span class="line" id="L210">        <span class="tok-kw">const</span> u_1 = z.mul(sinv);</span>
+<span class="line" id="L211">        <span class="tok-kw">const</span> u_2 = r.mul(sinv);</span>
+<span class="line" id="L212"></span>
+<span class="line" id="L213">        <span class="tok-comment">// Reconstruct pubkey point (ensuring it is on the curve)</span>
 </span>
-<span class="line" id="L210">        <span class="tok-kw">const</span> sinv = s.invert();</span>
-<span class="line" id="L211">        <span class="tok-kw">const</span> u_1 = z.mul(sinv);</span>
-<span class="line" id="L212">        <span class="tok-kw">const</span> u_2 = r.mul(sinv);</span>
-<span class="line" id="L213"></span>
-<span class="line" id="L214">        <span class="tok-comment">// Reconstruct pubkey point (ensuring it is on the curve)</span>
+<span class="line" id="L214">        <span class="tok-kw">const</span> qa = <span class="tok-kw">try</span> curve.fromSec1(pubkey);</span>
+<span class="line" id="L215"></span>
+<span class="line" id="L216">        <span class="tok-comment">// Check Qa != O</span>
 </span>
-<span class="line" id="L215">        <span class="tok-kw">const</span> qa = <span class="tok-kw">try</span> curve.fromSec1(pubkey);</span>
-<span class="line" id="L216"></span>
-<span class="line" id="L217">        <span class="tok-comment">// Check Qa != O</span>
+<span class="line" id="L217">        <span class="tok-kw">if</span> (qa.equivalent(curve.identityElement)) {</span>
+<span class="line" id="L218">            <span class="tok-kw">return</span> <span class="tok-null">false</span>;</span>
+<span class="line" id="L219">        }</span>
+<span class="line" id="L220"></span>
+<span class="line" id="L221">        <span class="tok-comment">// Compute (u_1 * G) + (u_2 * qa)</span>
 </span>
-<span class="line" id="L218">        <span class="tok-kw">if</span> (qa.equivalent(curve.identityElement)) {</span>
-<span class="line" id="L219">            <span class="tok-kw">return</span> <span class="tok-null">false</span>;</span>
-<span class="line" id="L220">        }</span>
-<span class="line" id="L221"></span>
-<span class="line" id="L222">        <span class="tok-comment">// Compute (u_1 * G) + (u_2 * qa)</span>
+<span class="line" id="L222">        <span class="tok-kw">const</span> p1 = curve.mulDoubleBasePublic(curve.basePoint, u_1.toBytes(.Little), qa, u_2.toBytes(.Little), .Little) <span class="tok-kw">catch</span> <span class="tok-kw">return</span> <span class="tok-null">false</span>;</span>
+<span class="line" id="L223"></span>
+<span class="line" id="L224">        <span class="tok-kw">const</span> affine = p1.affineCoordinates();</span>
+<span class="line" id="L225">        <span class="tok-kw">const</span> affine_bytes = affine.x.toBytes(.Big);</span>
+<span class="line" id="L226">        <span class="tok-kw">const</span> scalar = curve.scalar.Scalar.fromBytes(affine_bytes, .Big) <span class="tok-kw">catch</span> <span class="tok-kw">unreachable</span>;</span>
+<span class="line" id="L227"></span>
+<span class="line" id="L228">        <span class="tok-comment">// Check if r is congruent to x1 mod N</span>
 </span>
-<span class="line" id="L223">        <span class="tok-kw">const</span> p1 = curve.mulDoubleBasePublic(curve.basePoint, u_1.toBytes(.Little), qa, u_2.toBytes(.Little), .Little) <span class="tok-kw">catch</span> <span class="tok-kw">return</span> <span class="tok-null">false</span>;</span>
-<span class="line" id="L224"></span>
-<span class="line" id="L225">        <span class="tok-kw">const</span> affine = p1.affineCoordinates();</span>
-<span class="line" id="L226">        <span class="tok-kw">const</span> affine_bytes = affine.x.toBytes(.Big);</span>
-<span class="line" id="L227">        <span class="tok-kw">const</span> scalar = curve.scalar.Scalar.fromBytes(affine_bytes, .Big) <span class="tok-kw">catch</span> <span class="tok-kw">unreachable</span>;</span>
-<span class="line" id="L228"></span>
-<span class="line" id="L229">        <span class="tok-comment">// Check if r is congruent to x1 mod N</span>
+<span class="line" id="L229">        <span class="tok-kw">return</span> r.equivalent(scalar);</span>
+<span class="line" id="L230">    }</span>
+<span class="line" id="L231"></span>
+<span class="line" id="L232">    <span class="tok-comment">/// Recovers an address from a signature and message</span></span>
+<span class="line" id="L233">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">recoverAddress</span>(self: Self, message: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !web3.Address {</span>
+<span class="line" id="L234">        <span class="tok-kw">const</span> pubkey = <span class="tok-kw">try</span> recoverPubkey(self, message);</span>
+<span class="line" id="L235">        <span class="tok-kw">return</span> <span class="tok-kw">try</span> web3.Address.fromUncompressedSec1(pubkey);</span>
+<span class="line" id="L236">    }</span>
+<span class="line" id="L237"></span>
+<span class="line" id="L238">    <span class="tok-comment">/// Recovers an uncompressed SEC1 encoded pubkey from a signature and message</span></span>
+<span class="line" id="L239">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">recoverPubkey</span>(self: Self, message: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) ![<span class="tok-number">65</span>]<span class="tok-type">u8</span> {</span>
+<span class="line" id="L240">        <span class="tok-comment">// Reconstruct r and s field elements</span>
 </span>
-<span class="line" id="L230">        <span class="tok-kw">return</span> r.equivalent(scalar);</span>
-<span class="line" id="L231">    }</span>
-<span class="line" id="L232"></span>
-<span class="line" id="L233">    <span class="tok-comment">/// Recovers an address from a signature and message</span></span>
-<span class="line" id="L234">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">recoverAddress</span>(self: Self, message: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !web3.Address {</span>
-<span class="line" id="L235">        <span class="tok-kw">const</span> pubkey = <span class="tok-kw">try</span> recoverPubkey(self, message);</span>
-<span class="line" id="L236">        <span class="tok-kw">return</span> <span class="tok-kw">try</span> web3.Address.fromUncompressedSec1(pubkey);</span>
-<span class="line" id="L237">    }</span>
-<span class="line" id="L238"></span>
-<span class="line" id="L239">    <span class="tok-comment">/// Recovers an uncompressed SEC1 encoded pubkey from a signature and message</span></span>
-<span class="line" id="L240">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">recoverPubkey</span>(self: Self, message: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) ![<span class="tok-number">65</span>]<span class="tok-type">u8</span> {</span>
-<span class="line" id="L241">        <span class="tok-comment">// Reconstruct r and s field elements</span>
+<span class="line" id="L241">        <span class="tok-kw">var</span> r_bytes: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L242">        std.mem.writeIntLittle(<span class="tok-type">u256</span>, &amp;r_bytes, self.r);</span>
+<span class="line" id="L243">        <span class="tok-kw">var</span> r = <span class="tok-kw">try</span> curve.scalar.Scalar.fromBytes(r_bytes, .Little);</span>
+<span class="line" id="L244"></span>
+<span class="line" id="L245">        <span class="tok-kw">var</span> s_bytes: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L246">        std.mem.writeIntLittle(<span class="tok-type">u256</span>, &amp;s_bytes, self.s);</span>
+<span class="line" id="L247">        <span class="tok-kw">var</span> s = <span class="tok-kw">try</span> curve.scalar.Scalar.fromBytes(s_bytes, .Little);</span>
+<span class="line" id="L248"></span>
+<span class="line" id="L249">        <span class="tok-comment">// Hash message</span>
 </span>
-<span class="line" id="L242">        <span class="tok-kw">var</span> r_bytes: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L243">        std.mem.writeIntLittle(<span class="tok-type">u256</span>, &amp;r_bytes, self.r);</span>
-<span class="line" id="L244">        <span class="tok-kw">var</span> r = <span class="tok-kw">try</span> curve.scalar.Scalar.fromBytes(r_bytes, .Little);</span>
-<span class="line" id="L245"></span>
-<span class="line" id="L246">        <span class="tok-kw">var</span> s_bytes: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L247">        std.mem.writeIntLittle(<span class="tok-type">u256</span>, &amp;s_bytes, self.s);</span>
-<span class="line" id="L248">        <span class="tok-kw">var</span> s = <span class="tok-kw">try</span> curve.scalar.Scalar.fromBytes(s_bytes, .Little);</span>
-<span class="line" id="L249"></span>
-<span class="line" id="L250">        <span class="tok-comment">// Hash message</span>
+<span class="line" id="L250">        <span class="tok-kw">var</span> hash: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L251">        std.crypto.hash.sha3.Keccak256.hash(message, &amp;hash, .{});</span>
+<span class="line" id="L252">        <span class="tok-kw">const</span> z = hashToScalar(hash);</span>
+<span class="line" id="L253"></span>
+<span class="line" id="L254">        <span class="tok-comment">// Compute u1 and u2</span>
 </span>
-<span class="line" id="L251">        <span class="tok-kw">var</span> hash: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L252">        std.crypto.hash.sha3.Keccak256.hash(message, &amp;hash, .{});</span>
-<span class="line" id="L253">        <span class="tok-kw">const</span> z = hashToScalar(hash);</span>
-<span class="line" id="L254"></span>
-<span class="line" id="L255">        <span class="tok-comment">// Compute u1 and u2</span>
+<span class="line" id="L255">        <span class="tok-kw">const</span> rinv = r.invert();</span>
+<span class="line" id="L256">        <span class="tok-kw">const</span> u_1 = z.mul(rinv).neg();</span>
+<span class="line" id="L257">        <span class="tok-kw">const</span> u_2 = s.mul(rinv);</span>
+<span class="line" id="L258"></span>
+<span class="line" id="L259">        <span class="tok-kw">var</span> is_odd = (self.v % <span class="tok-number">2</span>) == <span class="tok-number">1</span>;</span>
+<span class="line" id="L260"></span>
+<span class="line" id="L261">        <span class="tok-comment">// Reconstruct curve point R</span>
 </span>
-<span class="line" id="L256">        <span class="tok-kw">const</span> rinv = r.invert();</span>
-<span class="line" id="L257">        <span class="tok-kw">const</span> u_1 = z.mul(rinv).neg();</span>
-<span class="line" id="L258">        <span class="tok-kw">const</span> u_2 = s.mul(rinv);</span>
-<span class="line" id="L259"></span>
-<span class="line" id="L260">        <span class="tok-kw">var</span> is_odd = (self.v % <span class="tok-number">2</span>) == <span class="tok-number">1</span>;</span>
-<span class="line" id="L261"></span>
-<span class="line" id="L262">        <span class="tok-comment">// Reconstruct curve point R</span>
+<span class="line" id="L262">        <span class="tok-kw">var</span> r_fe = <span class="tok-kw">try</span> curve.Fe.fromBytes(r_bytes, .Little);</span>
+<span class="line" id="L263">        <span class="tok-kw">var</span> y = <span class="tok-kw">try</span> curve.recoverY(r_fe, is_odd);</span>
+<span class="line" id="L264">        <span class="tok-kw">const</span> R = <span class="tok-kw">try</span> curve.fromAffineCoordinates(.{ .x = r_fe, .y = y });</span>
+<span class="line" id="L265"></span>
+<span class="line" id="L266">        <span class="tok-comment">// Compute (u_1 * G) + (u_2 * qa)</span>
 </span>
-<span class="line" id="L263">        <span class="tok-kw">var</span> r_fe = <span class="tok-kw">try</span> curve.Fe.fromBytes(r_bytes, .Little);</span>
-<span class="line" id="L264">        <span class="tok-kw">var</span> y = <span class="tok-kw">try</span> curve.recoverY(r_fe, is_odd);</span>
-<span class="line" id="L265">        <span class="tok-kw">const</span> R = <span class="tok-kw">try</span> curve.fromAffineCoordinates(.{ .x = r_fe, .y = y });</span>
-<span class="line" id="L266"></span>
-<span class="line" id="L267">        <span class="tok-comment">// Compute (u_1 * G) + (u_2 * qa)</span>
+<span class="line" id="L267">        <span class="tok-kw">const</span> qa = <span class="tok-kw">try</span> curve.mulDoubleBasePublic(curve.basePoint, u_1.toBytes(.Little), R, u_2.toBytes(.Little), .Little);</span>
+<span class="line" id="L268"></span>
+<span class="line" id="L269">        <span class="tok-kw">return</span> qa.toUncompressedSec1();</span>
+<span class="line" id="L270">    }</span>
+<span class="line" id="L271">};</span>
+<span class="line" id="L272"></span>
+<span class="line" id="L273"><span class="tok-comment">/// Hashes the supplied message to a scalar within the curve main sub group</span></span>
+<span class="line" id="L274"><span class="tok-kw">fn</span> <span class="tok-fn">hashToScalar</span>(hash: [<span class="tok-number">32</span>]<span class="tok-type">u8</span>) curve.scalar.Scalar {</span>
+<span class="line" id="L275">    <span class="tok-comment">// std.debug.print(&quot;Hash = {}\n&quot;, .{std.fmt.fmtSliceHexLower(&amp;hash)});</span>
 </span>
-<span class="line" id="L268">        <span class="tok-kw">const</span> qa = <span class="tok-kw">try</span> curve.mulDoubleBasePublic(curve.basePoint, u_1.toBytes(.Little), R, u_2.toBytes(.Little), .Little);</span>
-<span class="line" id="L269"></span>
-<span class="line" id="L270">        <span class="tok-kw">return</span> qa.toUncompressedSec1();</span>
-<span class="line" id="L271">    }</span>
-<span class="line" id="L272">};</span>
-<span class="line" id="L273"></span>
-<span class="line" id="L274"><span class="tok-comment">/// Hashes the supplied message to a scalar within the curve main sub group</span></span>
-<span class="line" id="L275"><span class="tok-kw">fn</span> <span class="tok-fn">hashToScalar</span>(hash: [<span class="tok-number">32</span>]<span class="tok-type">u8</span>) curve.scalar.Scalar {</span>
-<span class="line" id="L276">    <span class="tok-comment">// std.debug.print(&quot;Hash = {}\n&quot;, .{std.fmt.fmtSliceHexLower(&amp;hash)});</span>
+<span class="line" id="L276"></span>
+<span class="line" id="L277">    <span class="tok-kw">var</span> z_int = std.mem.readIntBig(<span class="tok-type">u256</span>, &amp;hash);</span>
+<span class="line" id="L278"></span>
+<span class="line" id="L279">    <span class="tok-kw">if</span> (z_int &lt; curve.scalar.field_order) {</span>
+<span class="line" id="L280">        <span class="tok-kw">return</span> curve.scalar.Scalar.fromBytes(hash, .Big) <span class="tok-kw">catch</span> <span class="tok-kw">unreachable</span>;</span>
+<span class="line" id="L281">    }</span>
+<span class="line" id="L282"></span>
+<span class="line" id="L283">    z_int -= curve.scalar.field_order;</span>
+<span class="line" id="L284"></span>
+<span class="line" id="L285">    <span class="tok-kw">var</span> z_bytes: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L286">    std.mem.writeIntBig(<span class="tok-type">u256</span>, &amp;z_bytes, z_int);</span>
+<span class="line" id="L287">    <span class="tok-kw">return</span> curve.scalar.Scalar.fromBytes(z_bytes, .Big) <span class="tok-kw">catch</span> <span class="tok-kw">unreachable</span>;</span>
+<span class="line" id="L288">}</span>
+<span class="line" id="L289"></span>
+<span class="line" id="L290"><span class="tok-kw">test</span> <span class="tok-str">&quot;address computation&quot;</span> {</span>
+<span class="line" id="L291">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
+<span class="line" id="L292"></span>
+<span class="line" id="L293">    {</span>
+<span class="line" id="L294">        <span class="tok-kw">const</span> signing_key = <span class="tok-kw">try</span> SigningKey.fromString(<span class="tok-str">&quot;320631693565bf68a84069b852bce4616142f4f4c4d16e666d33e0615127b7a4&quot;</span>);</span>
+<span class="line" id="L295"></span>
+<span class="line" id="L296">        <span class="tok-kw">const</span> addr = <span class="tok-kw">try</span> signing_key.toAddress();</span>
+<span class="line" id="L297">        <span class="tok-kw">var</span> hex: [<span class="tok-number">20</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L298">        _ = <span class="tok-kw">try</span> std.fmt.hexToBytes(&amp;hex, <span class="tok-str">&quot;41c3e27461d5cb7623ca04aa485118ec6a0706cf&quot;</span>);</span>
+<span class="line" id="L299">        assert(std.mem.eql(<span class="tok-type">u8</span>, &amp;addr.raw, &amp;hex));</span>
+<span class="line" id="L300">    }</span>
+<span class="line" id="L301">}</span>
+<span class="line" id="L302"></span>
+<span class="line" id="L303"><span class="tok-kw">test</span> <span class="tok-str">&quot;signing and recovery&quot;</span> {</span>
+<span class="line" id="L304">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
+<span class="line" id="L305"></span>
+<span class="line" id="L306">    <span class="tok-kw">const</span> signing_key = <span class="tok-kw">try</span> SigningKey.fromString(<span class="tok-str">&quot;320631693565bf68a84069b852bce4616142f4f4c4d16e666d33e0615127b7a4&quot;</span>);</span>
+<span class="line" id="L307"></span>
+<span class="line" id="L308">    <span class="tok-kw">const</span> pubkey = <span class="tok-kw">try</span> signing_key.toPubkeyUncompressedSec1();</span>
+<span class="line" id="L309"></span>
+<span class="line" id="L310">    <span class="tok-kw">const</span> message = <span class="tok-str">&quot;Hello, world!&quot;</span>;</span>
+<span class="line" id="L311">    <span class="tok-kw">const</span> signature = <span class="tok-kw">try</span> signing_key.sign(message);</span>
+<span class="line" id="L312">    <span class="tok-kw">const</span> valid = <span class="tok-kw">try</span> signature.verify(&amp;pubkey, message);</span>
+<span class="line" id="L313"></span>
+<span class="line" id="L314">    assert(valid);</span>
+<span class="line" id="L315"></span>
+<span class="line" id="L316">    <span class="tok-kw">const</span> recovered_addr = <span class="tok-kw">try</span> signature.recoverAddress(message);</span>
+<span class="line" id="L317">    <span class="tok-kw">const</span> actual_addr = <span class="tok-kw">try</span> signing_key.toAddress();</span>
+<span class="line" id="L318"></span>
+<span class="line" id="L319">    assert(std.mem.eql(<span class="tok-type">u8</span>, &amp;recovered_addr.raw, &amp;actual_addr.raw));</span>
+<span class="line" id="L320">}</span>
+<span class="line" id="L321"></span>
+<span class="line" id="L322"><span class="tok-kw">test</span> <span class="tok-str">&quot;eip-155&quot;</span> {</span>
+<span class="line" id="L323">    <span class="tok-kw">const</span> allocator = std.testing.allocator;</span>
+<span class="line" id="L324">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
+<span class="line" id="L325"></span>
+<span class="line" id="L326">    <span class="tok-comment">// Test vector: https://eips.ethereum.org/EIPS/eip-155</span>
 </span>
-<span class="line" id="L277"></span>
-<span class="line" id="L278">    <span class="tok-kw">var</span> z_int = std.mem.readIntBig(<span class="tok-type">u256</span>, &amp;hash);</span>
-<span class="line" id="L279"></span>
-<span class="line" id="L280">    <span class="tok-kw">if</span> (z_int &lt; curve.scalar.field_order) {</span>
-<span class="line" id="L281">        <span class="tok-kw">return</span> curve.scalar.Scalar.fromBytes(hash, .Big) <span class="tok-kw">catch</span> <span class="tok-kw">unreachable</span>;</span>
-<span class="line" id="L282">    }</span>
-<span class="line" id="L283"></span>
-<span class="line" id="L284">    z_int -= curve.scalar.field_order;</span>
-<span class="line" id="L285"></span>
-<span class="line" id="L286">    <span class="tok-kw">var</span> z_bytes: [<span class="tok-number">32</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L287">    std.mem.writeIntBig(<span class="tok-type">u256</span>, &amp;z_bytes, z_int);</span>
-<span class="line" id="L288">    <span class="tok-kw">return</span> curve.scalar.Scalar.fromBytes(z_bytes, .Big) <span class="tok-kw">catch</span> <span class="tok-kw">unreachable</span>;</span>
-<span class="line" id="L289">}</span>
-<span class="line" id="L290"></span>
-<span class="line" id="L291"><span class="tok-kw">test</span> <span class="tok-str">&quot;address computation&quot;</span> {</span>
-<span class="line" id="L292">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
-<span class="line" id="L293"></span>
-<span class="line" id="L294">    {</span>
-<span class="line" id="L295">        <span class="tok-kw">const</span> signing_key = <span class="tok-kw">try</span> SigningKey.fromString(<span class="tok-str">&quot;320631693565bf68a84069b852bce4616142f4f4c4d16e666d33e0615127b7a4&quot;</span>);</span>
-<span class="line" id="L296"></span>
-<span class="line" id="L297">        <span class="tok-kw">const</span> addr = <span class="tok-kw">try</span> signing_key.toAddress();</span>
-<span class="line" id="L298">        <span class="tok-kw">var</span> hex: [<span class="tok-number">20</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L299">        _ = <span class="tok-kw">try</span> std.fmt.hexToBytes(&amp;hex, <span class="tok-str">&quot;41c3e27461d5cb7623ca04aa485118ec6a0706cf&quot;</span>);</span>
-<span class="line" id="L300">        assert(std.mem.eql(<span class="tok-type">u8</span>, &amp;addr.raw, &amp;hex));</span>
-<span class="line" id="L301">    }</span>
-<span class="line" id="L302">}</span>
-<span class="line" id="L303"></span>
-<span class="line" id="L304"><span class="tok-kw">test</span> <span class="tok-str">&quot;signing and recovery&quot;</span> {</span>
-<span class="line" id="L305">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
-<span class="line" id="L306"></span>
-<span class="line" id="L307">    <span class="tok-kw">const</span> signing_key = <span class="tok-kw">try</span> SigningKey.fromString(<span class="tok-str">&quot;79afbf7147841fca72b45a1978dd7669470ba67abbe5c220062924380c9c364b&quot;</span>);</span>
-<span class="line" id="L308"></span>
-<span class="line" id="L309">    <span class="tok-kw">const</span> pubkey = <span class="tok-kw">try</span> signing_key.toPubkeyUncompressedSec1();</span>
-<span class="line" id="L310"></span>
-<span class="line" id="L311">    <span class="tok-kw">const</span> message = <span class="tok-str">&quot;Hello, world!&quot;</span>;</span>
-<span class="line" id="L312">    <span class="tok-kw">const</span> signature = <span class="tok-kw">try</span> signing_key.sign(message);</span>
-<span class="line" id="L313">    <span class="tok-kw">const</span> valid = <span class="tok-kw">try</span> signature.verify(&amp;pubkey, message);</span>
-<span class="line" id="L314"></span>
-<span class="line" id="L315">    assert(valid);</span>
-<span class="line" id="L316"></span>
-<span class="line" id="L317">    <span class="tok-kw">const</span> recovered_addr = <span class="tok-kw">try</span> signature.recoverAddress(message);</span>
-<span class="line" id="L318">    <span class="tok-kw">const</span> actual_addr = <span class="tok-kw">try</span> signing_key.toAddress();</span>
-<span class="line" id="L319"></span>
-<span class="line" id="L320">    assert(std.mem.eql(<span class="tok-type">u8</span>, &amp;recovered_addr.raw, &amp;actual_addr.raw));</span>
-<span class="line" id="L321">}</span>
-<span class="line" id="L322"></span>
-<span class="line" id="L323"><span class="tok-kw">test</span> <span class="tok-str">&quot;eip-155&quot;</span> {</span>
-<span class="line" id="L324">    <span class="tok-kw">const</span> allocator = std.testing.allocator;</span>
-<span class="line" id="L325">    <span class="tok-kw">const</span> assert = std.debug.assert;</span>
-<span class="line" id="L326"></span>
-<span class="line" id="L327">    <span class="tok-comment">// Test vector: https://eips.ethereum.org/EIPS/eip-155</span>
-</span>
-<span class="line" id="L328">    <span class="tok-kw">var</span> tx = web3.TransactionRequest{</span>
-<span class="line" id="L329">        .chain_id = <span class="tok-number">1</span>,</span>
-<span class="line" id="L330">        .nonce = <span class="tok-number">9</span>,</span>
-<span class="line" id="L331">        .gas_price = <span class="tok-number">20</span> * std.math.pow(<span class="tok-type">u256</span>, <span class="tok-number">10</span>, <span class="tok-number">9</span>),</span>
-<span class="line" id="L332">        .gas = <span class="tok-number">21000</span>,</span>
-<span class="line" id="L333">        .to = <span class="tok-kw">try</span> web3.Address.fromString(<span class="tok-str">&quot;0x3535353535353535353535353535353535353535&quot;</span>),</span>
-<span class="line" id="L334">        .value = std.math.pow(<span class="tok-type">u256</span>, <span class="tok-number">10</span>, <span class="tok-number">18</span>),</span>
-<span class="line" id="L335">    };</span>
-<span class="line" id="L336"></span>
-<span class="line" id="L337">    <span class="tok-kw">const</span> encoded = <span class="tok-kw">try</span> tx.encode(allocator);</span>
-<span class="line" id="L338">    <span class="tok-kw">defer</span> allocator.free(encoded);</span>
-<span class="line" id="L339"></span>
-<span class="line" id="L340">    <span class="tok-kw">const</span> signing_key = <span class="tok-kw">try</span> SigningKey.fromString(<span class="tok-str">&quot;0x4646464646464646464646464646464646464646464646464646464646464646&quot;</span>);</span>
-<span class="line" id="L341"></span>
-<span class="line" id="L342">    <span class="tok-kw">var</span> sig = <span class="tok-kw">try</span> signing_key.sign(encoded);</span>
-<span class="line" id="L343">    <span class="tok-kw">try</span> sig.addChainId(tx.chain_id.?);</span>
-<span class="line" id="L344"></span>
-<span class="line" id="L345">    tx.addSignature(sig);</span>
-<span class="line" id="L346"></span>
-<span class="line" id="L347">    <span class="tok-kw">const</span> signed_tx = <span class="tok-kw">try</span> tx.encode(allocator);</span>
-<span class="line" id="L348">    <span class="tok-kw">defer</span> allocator.free(signed_tx);</span>
-<span class="line" id="L349"></span>
-<span class="line" id="L350">    <span class="tok-kw">var</span> hex: [<span class="tok-number">1024</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
-<span class="line" id="L351">    <span class="tok-kw">var</span> result = <span class="tok-kw">try</span> std.fmt.hexToBytes(&amp;hex, <span class="tok-str">&quot;f86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83&quot;</span>);</span>
-<span class="line" id="L352"></span>
-<span class="line" id="L353">    assert(std.mem.eql(<span class="tok-type">u8</span>, result, signed_tx));</span>
-<span class="line" id="L354">}</span>
-<span class="line" id="L355"></span>
+<span class="line" id="L327">    <span class="tok-kw">var</span> tx = web3.TransactionRequest{</span>
+<span class="line" id="L328">        .chain_id = <span class="tok-number">1</span>,</span>
+<span class="line" id="L329">        .nonce = <span class="tok-number">9</span>,</span>
+<span class="line" id="L330">        .gas_price = <span class="tok-number">20</span> * std.math.pow(<span class="tok-type">u256</span>, <span class="tok-number">10</span>, <span class="tok-number">9</span>),</span>
+<span class="line" id="L331">        .gas = <span class="tok-number">21000</span>,</span>
+<span class="line" id="L332">        .to = <span class="tok-kw">try</span> web3.Address.fromString(<span class="tok-str">&quot;0x3535353535353535353535353535353535353535&quot;</span>),</span>
+<span class="line" id="L333">        .value = std.math.pow(<span class="tok-type">u256</span>, <span class="tok-number">10</span>, <span class="tok-number">18</span>),</span>
+<span class="line" id="L334">    };</span>
+<span class="line" id="L335"></span>
+<span class="line" id="L336">    <span class="tok-kw">const</span> encoded = <span class="tok-kw">try</span> tx.encode(allocator);</span>
+<span class="line" id="L337">    <span class="tok-kw">defer</span> allocator.free(encoded);</span>
+<span class="line" id="L338"></span>
+<span class="line" id="L339">    <span class="tok-kw">const</span> signing_key = <span class="tok-kw">try</span> SigningKey.fromString(<span class="tok-str">&quot;4646464646464646464646464646464646464646464646464646464646464646&quot;</span>);</span>
+<span class="line" id="L340"></span>
+<span class="line" id="L341">    <span class="tok-kw">var</span> sig = <span class="tok-kw">try</span> signing_key.sign(encoded);</span>
+<span class="line" id="L342">    <span class="tok-kw">try</span> sig.addChainId(tx.chain_id.?);</span>
+<span class="line" id="L343"></span>
+<span class="line" id="L344">    tx.addSignature(sig);</span>
+<span class="line" id="L345"></span>
+<span class="line" id="L346">    <span class="tok-kw">const</span> signed_tx = <span class="tok-kw">try</span> tx.encode(allocator);</span>
+<span class="line" id="L347">    <span class="tok-kw">defer</span> allocator.free(signed_tx);</span>
+<span class="line" id="L348"></span>
+<span class="line" id="L349">    <span class="tok-kw">var</span> hex: [<span class="tok-number">1024</span>]<span class="tok-type">u8</span> = <span class="tok-null">undefined</span>;</span>
+<span class="line" id="L350">    <span class="tok-kw">var</span> result = <span class="tok-kw">try</span> std.fmt.hexToBytes(&amp;hex, <span class="tok-str">&quot;f86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83&quot;</span>);</span>
+<span class="line" id="L351"></span>
+<span class="line" id="L352">    assert(std.mem.eql(<span class="tok-type">u8</span>, result, signed_tx));</span>
+<span class="line" id="L353">}</span>
+<span class="line" id="L354"></span>
 </code></pre></body>
 </html>

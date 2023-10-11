@@ -261,78 +261,82 @@
 <span class="line" id="L147">    }</span>
 <span class="line" id="L148"></span>
 <span class="line" id="L149">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">callSelector</span>(self: *<span class="tok-kw">const</span> Self, selector: [<span class="tok-number">4</span>]<span class="tok-type">u8</span>, args: <span class="tok-kw">anytype</span>, <span class="tok-kw">comptime</span> T: <span class="tok-type">type</span>, opts: web3.CallOptions) !T {</span>
-<span class="line" id="L150">        <span class="tok-kw">const</span> calldata = <span class="tok-kw">try</span> web3.abi.CalldataArgEncoder.encodeWithSelector(self.allocator, selector, args);</span>
-<span class="line" id="L151">        <span class="tok-kw">defer</span> self.allocator.free(calldata);</span>
-<span class="line" id="L152">        <span class="tok-kw">const</span> result = <span class="tok-kw">try</span> self.callInternal(calldata, opts);</span>
-<span class="line" id="L153">        <span class="tok-kw">defer</span> self.allocator.free(result);</span>
-<span class="line" id="L154">        <span class="tok-kw">return</span> web3.abi.decodeArg(self.allocator, result, <span class="tok-number">0</span>, T);</span>
-<span class="line" id="L155">    }</span>
-<span class="line" id="L156"></span>
-<span class="line" id="L157">    <span class="tok-kw">fn</span> <span class="tok-fn">callInternal</span>(self: *<span class="tok-kw">const</span> Self, calldata: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>, opts: web3.CallOptions) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
-<span class="line" id="L158">        <span class="tok-kw">return</span> <span class="tok-kw">switch</span> (opts.tx_type) {</span>
-<span class="line" id="L159">            .eip1559 =&gt; |tx| <span class="tok-kw">try</span> self.provider.call(web3.TransactionRequest{</span>
-<span class="line" id="L160">                .from = opts.from,</span>
-<span class="line" id="L161">                .to = self.address,</span>
-<span class="line" id="L162">                .value = opts.value,</span>
-<span class="line" id="L163">                .data = web3.DataHexString.wrap(calldata),</span>
-<span class="line" id="L164">                .gas = opts.gas,</span>
-<span class="line" id="L165">                .max_fee_per_gas = tx.max_fee_per_gas,</span>
-<span class="line" id="L166">                .max_priority_fee_per_gas = tx.max_priority_fee_per_gas,</span>
-<span class="line" id="L167">            }, opts.block_tag),</span>
-<span class="line" id="L168">            .legacy =&gt; |tx| <span class="tok-kw">try</span> self.provider.call(web3.TransactionRequest{</span>
-<span class="line" id="L169">                .from = opts.from,</span>
-<span class="line" id="L170">                .to = self.address,</span>
-<span class="line" id="L171">                .value = opts.value,</span>
-<span class="line" id="L172">                .data = web3.DataHexString.wrap(calldata),</span>
-<span class="line" id="L173">                .gas = opts.gas,</span>
-<span class="line" id="L174">                .gas_price = tx.gas_price,</span>
-<span class="line" id="L175">            }, opts.block_tag),</span>
-<span class="line" id="L176">        };</span>
-<span class="line" id="L177">    }</span>
-<span class="line" id="L178">};</span>
-<span class="line" id="L179"></span>
-<span class="line" id="L180"><span class="tok-comment">/// A dynamically dispatched provider for performing functions required by the contract abstraction</span></span>
-<span class="line" id="L181"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> Provider = <span class="tok-kw">struct</span> {</span>
-<span class="line" id="L182">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
+<span class="line" id="L150">        <span class="tok-kw">const</span> tx = <span class="tok-kw">try</span> self.prepareTransaction(selector, args, opts);</span>
+<span class="line" id="L151">        <span class="tok-kw">defer</span> tx.deinit(self.allocator);</span>
+<span class="line" id="L152"></span>
+<span class="line" id="L153">        <span class="tok-kw">const</span> result = <span class="tok-kw">try</span> self.provider.call(self.allocator, tx, opts.block_tag);</span>
+<span class="line" id="L154">        <span class="tok-kw">defer</span> self.allocator.free(result);</span>
+<span class="line" id="L155"></span>
+<span class="line" id="L156">        <span class="tok-kw">return</span> web3.abi.decodeArg(self.allocator, result, <span class="tok-number">0</span>, T);</span>
+<span class="line" id="L157">    }</span>
+<span class="line" id="L158"></span>
+<span class="line" id="L159">    <span class="tok-kw">pub</span> <span class="tok-kw">fn</span> <span class="tok-fn">prepareTransaction</span>(self: Self, selector: [<span class="tok-number">4</span>]<span class="tok-type">u8</span>, args: <span class="tok-kw">anytype</span>, opts: web3.CallOptions) !web3.TransactionRequest {</span>
+<span class="line" id="L160">        <span class="tok-kw">const</span> calldata = <span class="tok-kw">try</span> web3.abi.CalldataArgEncoder.encodeWithSelector(self.allocator, selector, args);</span>
+<span class="line" id="L161"></span>
+<span class="line" id="L162">        <span class="tok-kw">return</span> <span class="tok-kw">switch</span> (opts.tx_type) {</span>
+<span class="line" id="L163">            .eip1559 =&gt; |tx| web3.TransactionRequest{</span>
+<span class="line" id="L164">                .from = opts.from,</span>
+<span class="line" id="L165">                .to = self.address,</span>
+<span class="line" id="L166">                .value = opts.value,</span>
+<span class="line" id="L167">                .data = web3.DataHexString.wrap(calldata),</span>
+<span class="line" id="L168">                .gas = opts.gas,</span>
+<span class="line" id="L169">                .max_fee_per_gas = tx.max_fee_per_gas,</span>
+<span class="line" id="L170">                .max_priority_fee_per_gas = tx.max_priority_fee_per_gas,</span>
+<span class="line" id="L171">            },</span>
+<span class="line" id="L172">            .legacy =&gt; |tx| web3.TransactionRequest{</span>
+<span class="line" id="L173">                .from = opts.from,</span>
+<span class="line" id="L174">                .to = self.address,</span>
+<span class="line" id="L175">                .value = opts.value,</span>
+<span class="line" id="L176">                .data = web3.DataHexString.wrap(calldata),</span>
+<span class="line" id="L177">                .gas = opts.gas,</span>
+<span class="line" id="L178">                .gas_price = tx.gas_price,</span>
+<span class="line" id="L179">            },</span>
+<span class="line" id="L180">        };</span>
+<span class="line" id="L181">    }</span>
+<span class="line" id="L182">};</span>
 <span class="line" id="L183"></span>
-<span class="line" id="L184">    <span class="tok-comment">// The type erased pointer to the implementation</span>
-</span>
-<span class="line" id="L185">    ptr: *<span class="tok-type">anyopaque</span>,</span>
-<span class="line" id="L186">    vtable: *<span class="tok-kw">const</span> VTable,</span>
+<span class="line" id="L184"><span class="tok-comment">/// A dynamically dispatched provider for performing functions required by the contract abstraction</span></span>
+<span class="line" id="L185"><span class="tok-kw">pub</span> <span class="tok-kw">const</span> Provider = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L186">    <span class="tok-kw">const</span> Self = <span class="tok-builtin">@This</span>();</span>
 <span class="line" id="L187"></span>
-<span class="line" id="L188">    <span class="tok-kw">pub</span> <span class="tok-kw">const</span> VTable = <span class="tok-kw">struct</span> {</span>
-<span class="line" id="L189">        call: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) <span class="tok-type">anyerror</span>![]<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
-<span class="line" id="L190">        estimateGas: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, tx: web3.TransactionRequest) <span class="tok-type">anyerror</span>!<span class="tok-type">u256</span>,</span>
-<span class="line" id="L191">        send: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, tx: web3.TransactionRequest) <span class="tok-type">anyerror</span>!web3.Hash,</span>
-<span class="line" id="L192">        sendRaw: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, raw_tx: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) <span class="tok-type">anyerror</span>!web3.Hash,</span>
-<span class="line" id="L193">        getTransactionCount: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, address: web3.Address, block_tag: ?web3.BlockTag) <span class="tok-type">anyerror</span>!<span class="tok-type">u256</span>,</span>
-<span class="line" id="L194">        getFeeEstimate: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, speed: web3.FeeEstimateSpeed) <span class="tok-type">anyerror</span>!web3.FeeEstimate,</span>
-<span class="line" id="L195">    };</span>
-<span class="line" id="L196"></span>
-<span class="line" id="L197">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">call</span>(self: Self, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
-<span class="line" id="L198">        <span class="tok-kw">return</span> self.vtable.call(self.ptr, tx, block_tag);</span>
-<span class="line" id="L199">    }</span>
+<span class="line" id="L188">    <span class="tok-comment">// The type erased pointer to the implementation</span>
+</span>
+<span class="line" id="L189">    ptr: *<span class="tok-type">anyopaque</span>,</span>
+<span class="line" id="L190">    vtable: *<span class="tok-kw">const</span> VTable,</span>
+<span class="line" id="L191"></span>
+<span class="line" id="L192">    <span class="tok-kw">pub</span> <span class="tok-kw">const</span> VTable = <span class="tok-kw">struct</span> {</span>
+<span class="line" id="L193">        call: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, allocator: std.mem.Allocator, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) <span class="tok-type">anyerror</span>![]<span class="tok-kw">const</span> <span class="tok-type">u8</span>,</span>
+<span class="line" id="L194">        estimateGas: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, tx: web3.TransactionRequest) <span class="tok-type">anyerror</span>!<span class="tok-type">u256</span>,</span>
+<span class="line" id="L195">        send: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, tx: web3.TransactionRequest) <span class="tok-type">anyerror</span>!web3.Hash,</span>
+<span class="line" id="L196">        sendRaw: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, raw_tx: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) <span class="tok-type">anyerror</span>!web3.Hash,</span>
+<span class="line" id="L197">        getTransactionCount: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, address: web3.Address, block_tag: ?web3.BlockTag) <span class="tok-type">anyerror</span>!<span class="tok-type">u256</span>,</span>
+<span class="line" id="L198">        getFeeEstimate: *<span class="tok-kw">const</span> <span class="tok-kw">fn</span> (ctx: *<span class="tok-type">anyopaque</span>, speed: web3.FeeEstimateSpeed) <span class="tok-type">anyerror</span>!web3.FeeEstimate,</span>
+<span class="line" id="L199">    };</span>
 <span class="line" id="L200"></span>
-<span class="line" id="L201">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">estimateGas</span>(self: Self, tx: web3.TransactionRequest) !<span class="tok-type">u256</span> {</span>
-<span class="line" id="L202">        <span class="tok-kw">return</span> self.vtable.estimateGas(self.ptr, tx);</span>
+<span class="line" id="L201">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">call</span>(self: Self, allocator: std.mem.Allocator, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]<span class="tok-kw">const</span> <span class="tok-type">u8</span> {</span>
+<span class="line" id="L202">        <span class="tok-kw">return</span> self.vtable.call(self.ptr, allocator, tx, block_tag);</span>
 <span class="line" id="L203">    }</span>
 <span class="line" id="L204"></span>
-<span class="line" id="L205">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">send</span>(self: Self, tx: web3.TransactionRequest) !web3.Hash {</span>
-<span class="line" id="L206">        <span class="tok-kw">return</span> self.vtable.send(self.ptr, tx);</span>
+<span class="line" id="L205">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">estimateGas</span>(self: Self, tx: web3.TransactionRequest) !<span class="tok-type">u256</span> {</span>
+<span class="line" id="L206">        <span class="tok-kw">return</span> self.vtable.estimateGas(self.ptr, tx);</span>
 <span class="line" id="L207">    }</span>
 <span class="line" id="L208"></span>
-<span class="line" id="L209">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">sendRaw</span>(self: Self, raw_tx: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !web3.Hash {</span>
-<span class="line" id="L210">        <span class="tok-kw">return</span> self.vtable.sendRaw(self.ptr, raw_tx);</span>
+<span class="line" id="L209">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">send</span>(self: Self, tx: web3.TransactionRequest) !web3.Hash {</span>
+<span class="line" id="L210">        <span class="tok-kw">return</span> self.vtable.send(self.ptr, tx);</span>
 <span class="line" id="L211">    }</span>
 <span class="line" id="L212"></span>
-<span class="line" id="L213">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">getTransactionCount</span>(self: Self, address: web3.Address, block_tag: ?web3.BlockTag) !<span class="tok-type">u256</span> {</span>
-<span class="line" id="L214">        <span class="tok-kw">return</span> self.vtable.getTransactionCount(self.ptr, address, block_tag);</span>
+<span class="line" id="L213">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">sendRaw</span>(self: Self, raw_tx: []<span class="tok-kw">const</span> <span class="tok-type">u8</span>) !web3.Hash {</span>
+<span class="line" id="L214">        <span class="tok-kw">return</span> self.vtable.sendRaw(self.ptr, raw_tx);</span>
 <span class="line" id="L215">    }</span>
 <span class="line" id="L216"></span>
-<span class="line" id="L217">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">getFeeEstimate</span>(self: Self, speed: web3.FeeEstimateSpeed) !web3.FeeEstimate {</span>
-<span class="line" id="L218">        <span class="tok-kw">return</span> self.vtable.getFeeEstimate(self.ptr, speed);</span>
+<span class="line" id="L217">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">getTransactionCount</span>(self: Self, address: web3.Address, block_tag: ?web3.BlockTag) !<span class="tok-type">u256</span> {</span>
+<span class="line" id="L218">        <span class="tok-kw">return</span> self.vtable.getTransactionCount(self.ptr, address, block_tag);</span>
 <span class="line" id="L219">    }</span>
-<span class="line" id="L220">};</span>
-<span class="line" id="L221"></span>
+<span class="line" id="L220"></span>
+<span class="line" id="L221">    <span class="tok-kw">pub</span> <span class="tok-kw">inline</span> <span class="tok-kw">fn</span> <span class="tok-fn">getFeeEstimate</span>(self: Self, speed: web3.FeeEstimateSpeed) !web3.FeeEstimate {</span>
+<span class="line" id="L222">        <span class="tok-kw">return</span> self.vtable.getFeeEstimate(self.ptr, speed);</span>
+<span class="line" id="L223">    }</span>
+<span class="line" id="L224">};</span>
+<span class="line" id="L225"></span>
 </code></pre></body>
 </html>

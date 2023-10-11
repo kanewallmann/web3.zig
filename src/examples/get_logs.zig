@@ -47,6 +47,6 @@ pub fn main() !void {
         const decoded_log = try web3.abi.decodeLog(allocator, log, rETH.events.TokensBurned.returnType);
 
         // FixedPoint (and Ether) types support the precision option when formating values
-        std.debug.print("{} burned {d:.6} rETH for {d:.6} ETH\n", .{ decoded_log.address, decoded_log.reth, decoded_log.eth });
+        std.debug.print("{} burned {:.6} rETH for {:.6} ETH\n", .{ decoded_log.address, decoded_log.reth, decoded_log.eth });
     }
 }

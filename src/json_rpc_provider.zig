@@ -148,9 +148,9 @@ pub const JsonRpcProvider = struct {
     }
 
     /// Implementation of `web3.Provider.call`
-    fn providerCall(ctx: *anyopaque, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]const u8 {
+    fn providerCall(ctx: *anyopaque, allocator: std.mem.Allocator, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]const u8 {
         var self: *Self = @ptrCast(@alignCast(ctx));
-        return @call(.always_inline, call, .{ self, tx, block_tag });
+        return @call(.always_inline, callAlloc, .{ self, allocator, tx, block_tag });
     }
 
     /// Implementation of `web3.Provider.estimateGas`
@@ -357,10 +357,14 @@ pub const JsonRpcProvider = struct {
     }
 
     /// eth_call
-    pub fn call(self: *Self, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]const u8 {
+    pub inline fn call(self: *Self, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]const u8 {
+        return self.call(self.allocator, tx, block_tag);
+    }
+
+    pub fn callAlloc(self: *Self, allocator: std.mem.Allocator, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]const u8 {
         var json_tx: *const web3.TransactionRequest = @ptrCast(&tx);
         const params = .{ json_tx, self.blockTagToString(block_tag) };
-        var data: web3.DataHexString = try self.send("eth_call", params, web3.DataHexString);
+        var data: web3.DataHexString = try self.sendAlloc(allocator, "eth_call", params, web3.DataHexString);
         return data.raw;
     }
 
@@ -464,7 +468,7 @@ pub const JsonRpcProvider = struct {
         const average: u256 = accum / fee_history.reward.?.len;
 
         return .{
-            .max_fee_per_gas = fee_history.base_fee_per_gas[fee_history.base_fee_per_gas.len - 1],
+            .max_fee_per_gas = fee_history.base_fee_per_gas[fee_history.base_fee_per_gas.len - 1] + average,
             .max_priority_fee_per_gas = average,
         };
     }
@@ -473,10 +477,15 @@ pub const JsonRpcProvider = struct {
     /// type. On failure, attempts to read an error message from the response and puts it in
     /// last_error_code and last_error_message. Memory is correctly cleaned up on error condition.
     /// Caller owns the memory otherwise.
-    pub fn send(self: *Self, method: []const u8, args: anytype, comptime T: type) !T {
+    pub inline fn send(self: *Self, method: []const u8, args: anytype, comptime T: type) !T {
+        return self.sendAlloc(self.allocator, method, args, T);
+    }
+
+    /// Same as `send` but with the supplied allocator instead of internal one
+    pub fn sendAlloc(self: *Self, allocator: std.mem.Allocator, method: []const u8, args: anytype, comptime T: type) !T {
         try self.sendInternal(method, args);
 
-        var arena = parser_allocator.ArenaAllocator.init(self.allocator);
+        var arena = parser_allocator.ArenaAllocator.init(allocator);
         var parent_allocator = arena.allocator();
 
         var ptr = self.response_buffer.items;
@@ -492,7 +501,7 @@ pub const JsonRpcProvider = struct {
             };
 
             if (self.last_error_message) |msg| {
-                self.allocator.free(msg);
+                allocator.free(msg);
             }
 
             self.last_error_message = error_result.@"error".message;

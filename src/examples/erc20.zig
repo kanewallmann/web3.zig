@@ -2,8 +2,6 @@ const std = @import("std");
 
 const web3 = @import("web3");
 
-const abi_json = @embedFile("erc20.json");
-
 const addr = web3.Address.fromString("0xf977814e90da44bfa03b6295a0616a897441acec") catch unreachable; // Binance wallet
 const usdt = web3.Address.fromString("0xdac17f958d2ee523a2206206994597c13d831ec7") catch unreachable;
 
@@ -40,10 +38,6 @@ pub fn main() !void {
     var json_rpc_provider = try web3.JsonRpcProvider.init(allocator, try std.Uri.parse(rpc_endpoint));
     defer json_rpc_provider.deinit();
 
-    // Parse the ABI from the json file
-    var abi = try web3.abi.parseJson(allocator, abi_json);
-    defer abi.deinit(allocator);
-
     // Create an erc20 instance
     const erc20 = ERC20.init(allocator, usdt, json_rpc_provider.provider());
 
@@ -66,5 +60,5 @@ pub fn main() !void {
     const block_number = try json_rpc_provider.getBlockNumber();
 
     // Print results
-    std.debug.print("\n{} has {d:.6} USDT and {:.5} ETH at block {:}\n", .{ addr, usdt_balance, eth_balance, block_number });
+    std.debug.print("\n{} has {:.6} USDT and {:.6} ETH at block {:}\n", .{ addr, usdt_balance, eth_balance, block_number });
 }

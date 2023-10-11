@@ -435,7 +435,6 @@ pub const JsonReader = struct {
                     @field(result, field.name) = default_value;
                 } else {
                     if (FTI != .Optional) {
-                        std.debug.print("Missing {s}\n", .{field.name});
                         return error.MissingRequiredField;
                     } else {
                         @field(result, field.name) = null;
@@ -853,11 +852,11 @@ test "writing" {
     // Struct
     {
         const val: struct {
-            hello: web3.IntHexString(u32),
-            world: web3.IntHexString(u32),
+            hello: u32,
+            world: u32,
         } = .{
-            .hello = web3.IntHexString(u32).wrap(0x20),
-            .world = web3.IntHexString(u32).wrap(0x40),
+            .hello = 0x20,
+            .world = 0x40,
         };
 
         var buf: [32]u8 = undefined;

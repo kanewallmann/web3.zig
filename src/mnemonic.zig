@@ -97,6 +97,7 @@ pub const WordList = struct {
         const entropy_bytes: u16 = std.math.divCeil(u16, entropy_bits, 8) catch unreachable;
 
         var out = try allocator.alloc(u8, entropy_bytes);
+        errdefer allocator.free(out);
 
         switch (word_count) {
             12 => @memcpy(out, &(try self.decode(12, mnemonic))),
@@ -108,6 +109,17 @@ pub const WordList = struct {
         }
 
         return out;
+    }
+
+    /// Validates the given mnemonic is valid (contains correct number of words and checksum is correct) and returns true if so
+    pub fn validate(self: Self, mneomnic: []const u8) bool {
+        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+        var allocator = gpa.allocator();
+
+        var entropy = self.decodeAlloc(allocator, mneomnic) catch return false;
+        allocator.free(entropy);
+
+        return true;
     }
 
     /// Decodes a given 12,15,18,21,24 word mnemonic phrase encoded in bip-39 format and returns the entropy.
@@ -191,32 +203,10 @@ pub const WordList = struct {
 
         return entropy;
     }
-
-    test "word list" {
-        const assert = std.debug.assert;
-
-        {
-            const k = try english.lookup("spike");
-            assert(k == 1678);
-        }
-
-        {
-            const k = try english.lookup("prepare");
-            assert(k == 1359);
-        }
-
-        {
-            const k = try english.lookup("zoo");
-            assert(k == 2047);
-        }
-
-        {
-            const k = try english.lookup("abandon");
-            assert(k == 0);
-        }
-    }
 };
 
+// TODO: Support passphrases
+/// Calculates the bip-39 seed from the given mnemonic phrase
 pub fn seedFromMnemonic(mnemonic: []const u8) ![64]u8 {
     var out: [64]u8 = undefined;
     try std.crypto.pwhash.pbkdf2(&out, mnemonic, "mnemonic", 2048, std.crypto.auth.hmac.sha2.HmacSha512);
@@ -249,14 +239,37 @@ fn loadWordList(raw: []const u8) [2048][]const u8 {
 test "mnemonic" {
     const assert = std.debug.assert;
     const allocator = std.testing.allocator;
-    _ = assert;
 
-    _ = try english.decode(24, "rose update response coin cream column wine timber lens repeat short trial mean pear conduct jealous ready negative mind army dance pulse noise capable");
-    _ = try english.decode(21, "opinion soldier planet cloth swarm polar negative hub will scene maid exotic love chuckle essay casino alcohol bird reward weird intact");
-    _ = try english.decode(18, "lottery sun canoe enjoy direct early champion dismiss tomorrow strategy scheme shell middle crouch head raven cement bring");
-    _ = try english.decode(15, "robot need ribbon wink hard dice space immune equal tell castle grant fun absent pond");
-    _ = try english.decode(12, "cat arch host enforce mixture agent weapon salon praise soldier scout dismiss");
+    assert(english.validate("rose update response coin cream column wine timber lens repeat short trial mean pear conduct jealous ready negative mind army dance pulse noise capable"));
+    assert(english.validate("opinion soldier planet cloth swarm polar negative hub will scene maid exotic love chuckle essay casino alcohol bird reward weird intact"));
+    assert(english.validate("lottery sun canoe enjoy direct early champion dismiss tomorrow strategy scheme shell middle crouch head raven cement bring"));
+    assert(english.validate("robot need ribbon wink hard dice space immune equal tell castle grant fun absent pond"));
+    assert(english.validate("cat arch host enforce mixture agent weapon salon praise soldier scout dismiss"));
 
     var entropy = try english.decodeAlloc(allocator, "cat arch host enforce mixture agent weapon salon praise soldier scout dismiss");
     allocator.free(entropy);
+}
+
+test "word list" {
+    const assert = std.debug.assert;
+
+    {
+        const k = try english.lookup("spike");
+        assert(k == 1678);
+    }
+
+    {
+        const k = try english.lookup("prepare");
+        assert(k == 1359);
+    }
+
+    {
+        const k = try english.lookup("zoo");
+        assert(k == 2047);
+    }
+
+    {
+        const k = try english.lookup("abandon");
+        assert(k == 0);
+    }
 }

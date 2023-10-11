@@ -75,7 +75,7 @@ pub fn FixedPoint(comptime decimals: comptime_int, comptime T: anytype) type {
     return struct {
         const Self = @This();
         pub const __is_fixed_point = void{}; // Used to determine at comptime this is a FixedPoint type
-        const one: T = std.math.pow(T, 10, decimals);
+        pub const one: T = std.math.pow(T, 10, decimals);
 
         const Double = @Type(std.builtin.Type{
             .Int = .{
@@ -200,23 +200,20 @@ pub fn FixedPoint(comptime decimals: comptime_int, comptime T: anytype) type {
             if (opts.precision) |precision| {
                 return self.toStringTrunc(precision, writer);
             } else {
-                return self.toString(writer);
+                return self.toStringTrunc(decimals, writer);
             }
         }
 
-        /// Writes this value to the given writer as a string
-        pub fn toString(self: Self, writer: anytype) !void {
-            const integer = @divFloor(self.raw, one);
-            const frac = @rem(self.raw, one);
-            return writer.print("{d}.{d}", .{ integer, frac });
+        pub inline fn toString(self: Self, writer: anytype) !void {
+            return self.toStringTrunc(decimals, writer);
         }
 
         /// Writes this value to the given writer as a string truncted to the requested decimal points
         pub fn toStringTrunc(self: Self, precision: usize, writer: anytype) !void {
             const integer = @divFloor(self.raw, one);
             const frac = @rem(self.raw, one);
-            var frac_str: [decimals]u8 = .{0} ** decimals;
-            _ = std.fmt.formatIntBuf(&frac_str, frac, 10, .lower, .{});
+            var frac_str: [decimals]u8 = undefined;
+            _ = std.fmt.formatIntBuf(&frac_str, frac, 10, .lower, .{ .width = decimals, .alignment = .right, .fill = '0' });
             try writer.print("{d}.", .{integer});
             _ = try writer.write(frac_str[0..precision]);
         }
@@ -754,12 +751,13 @@ pub const TransactionRequest = struct {
         },
     };
 
-    /// Determines the transaction type by the existence of `max_priority_fee_per_gas`
+    /// TODO: Support other transaction types
+    /// Determines the transaction type by the existence of `gas_price`
     pub fn getType(self: TransactionRequest) u32 {
-        if (self.max_priority_fee_per_gas != null) {
-            return 2;
-        } else {
+        if (self.gas_price != null) {
             return 0;
+        } else {
+            return 2;
         }
     }
 
@@ -768,6 +766,20 @@ pub const TransactionRequest = struct {
         if (self.data) |data| {
             allocator.free(data.raw);
         }
+    }
+
+    /// Returns the maximum cost of this transaction.
+    /// Errors if gas limit or fee parameters are not set.
+    pub fn getMaxCost(self: TransactionRequest) !Ether {
+        if (self.gas == null or (self.gas_price == null and self.max_fee_per_gas == null)) {
+            return error.MissingFields;
+        }
+
+        if (self.gas_price != null) {
+            return Ether.wrap(self.gas.? * self.gas_price.?);
+        }
+
+        return Ether.wrap(self.gas.? * self.max_fee_per_gas.?);
     }
 
     /// Adds the given signature to this TransactionRequest making it a signed transaction request

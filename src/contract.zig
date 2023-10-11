@@ -147,16 +147,20 @@ pub const ContractCaller = struct {
     }
 
     pub fn callSelector(self: *const Self, selector: [4]u8, args: anytype, comptime T: type, opts: web3.CallOptions) !T {
-        const calldata = try web3.abi.CalldataArgEncoder.encodeWithSelector(self.allocator, selector, args);
-        defer self.allocator.free(calldata);
-        const result = try self.callInternal(calldata, opts);
+        const tx = try self.prepareTransaction(selector, args, opts);
+        defer tx.deinit(self.allocator);
+
+        const result = try self.provider.call(self.allocator, tx, opts.block_tag);
         defer self.allocator.free(result);
+
         return web3.abi.decodeArg(self.allocator, result, 0, T);
     }
 
-    fn callInternal(self: *const Self, calldata: []const u8, opts: web3.CallOptions) ![]const u8 {
+    pub fn prepareTransaction(self: Self, selector: [4]u8, args: anytype, opts: web3.CallOptions) !web3.TransactionRequest {
+        const calldata = try web3.abi.CalldataArgEncoder.encodeWithSelector(self.allocator, selector, args);
+
         return switch (opts.tx_type) {
-            .eip1559 => |tx| try self.provider.call(web3.TransactionRequest{
+            .eip1559 => |tx| web3.TransactionRequest{
                 .from = opts.from,
                 .to = self.address,
                 .value = opts.value,
@@ -164,15 +168,15 @@ pub const ContractCaller = struct {
                 .gas = opts.gas,
                 .max_fee_per_gas = tx.max_fee_per_gas,
                 .max_priority_fee_per_gas = tx.max_priority_fee_per_gas,
-            }, opts.block_tag),
-            .legacy => |tx| try self.provider.call(web3.TransactionRequest{
+            },
+            .legacy => |tx| web3.TransactionRequest{
                 .from = opts.from,
                 .to = self.address,
                 .value = opts.value,
                 .data = web3.DataHexString.wrap(calldata),
                 .gas = opts.gas,
                 .gas_price = tx.gas_price,
-            }, opts.block_tag),
+            },
         };
     }
 };
@@ -186,7 +190,7 @@ pub const Provider = struct {
     vtable: *const VTable,
 
     pub const VTable = struct {
-        call: *const fn (ctx: *anyopaque, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) anyerror![]const u8,
+        call: *const fn (ctx: *anyopaque, allocator: std.mem.Allocator, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) anyerror![]const u8,
         estimateGas: *const fn (ctx: *anyopaque, tx: web3.TransactionRequest) anyerror!u256,
         send: *const fn (ctx: *anyopaque, tx: web3.TransactionRequest) anyerror!web3.Hash,
         sendRaw: *const fn (ctx: *anyopaque, raw_tx: []const u8) anyerror!web3.Hash,
@@ -194,8 +198,8 @@ pub const Provider = struct {
         getFeeEstimate: *const fn (ctx: *anyopaque, speed: web3.FeeEstimateSpeed) anyerror!web3.FeeEstimate,
     };
 
-    pub inline fn call(self: Self, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]const u8 {
-        return self.vtable.call(self.ptr, tx, block_tag);
+    pub inline fn call(self: Self, allocator: std.mem.Allocator, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]const u8 {
+        return self.vtable.call(self.ptr, allocator, tx, block_tag);
     }
 
     pub inline fn estimateGas(self: Self, tx: web3.TransactionRequest) !u256 {

@@ -19,7 +19,7 @@ pub const LocalSigner = struct {
 
     allocator: std.mem.Allocator,
     chain_id: u256 = 1,
-    private_key: web3.ecdsa.SigningKey,
+    signing_key: web3.ecdsa.SigningKey,
     address: web3.Address,
 
     /// Creates a signer from the given private key
@@ -28,7 +28,7 @@ pub const LocalSigner = struct {
         return Self{
             .allocator = allocator,
             .chain_id = options.chain_id,
-            .private_key = key,
+            .signing_key = key,
             .address = try key.toAddress(),
         };
     }
@@ -95,11 +95,10 @@ pub const LocalSigner = struct {
         const raw_tx = try tx.encode(self.allocator);
         defer self.allocator.free(raw_tx);
 
-        const signature = try self.sign(raw_tx);
+        var signature = try self.signing_key.sign(raw_tx);
+        signature.addChainId(self.chain_id) catch unreachable;
 
-        tx.v = (self.chain_id * 2) + 35 + signature.v;
-        tx.r = signature.r;
-        tx.s = signature.s;
+        tx.addSignature(signature);
 
         return tx;
     }
@@ -115,7 +114,7 @@ pub const LocalSigner = struct {
     }
 
     pub fn sign(self: Self, message: []const u8) !web3.ecdsa.Signature {
-        return self.private_key.sign(message);
+        return self.signing_key.sign(message);
     }
 };
 
@@ -178,7 +177,7 @@ pub const SigningProvider = struct {
     /// Fills gas with estimated gas via call to child_provider.
     /// Fills fee parameters with estimates based on current network conditions.
     /// Errors if from is not empty and set to an unknown address.
-    pub fn populateTransaction(self: *Self, tx_: web3.TransactionRequest) !web3.TransactionRequest {
+    pub fn populateTransaction(self: *Self, tx_: web3.TransactionRequest, speed: web3.FeeEstimateSpeed) !web3.TransactionRequest {
         var tx = tx_;
 
         const addr = try self.signer.getAddress();
@@ -205,7 +204,7 @@ pub const SigningProvider = struct {
 
         // Fill fees
         if (tx.gas_price == null and (tx.max_fee_per_gas == null or tx.max_priority_fee_per_gas == null)) {
-            const estimate = try self.child_provider.getFeeEstimate(.average);
+            const estimate = try self.child_provider.getFeeEstimate(speed);
 
             if (tx.max_fee_per_gas == null) {
                 tx.max_fee_per_gas = estimate.max_fee_per_gas;
@@ -213,6 +212,10 @@ pub const SigningProvider = struct {
 
             if (tx.max_priority_fee_per_gas == null) {
                 tx.max_priority_fee_per_gas = estimate.max_priority_fee_per_gas;
+            }
+
+            if (tx.max_priority_fee_per_gas.? > tx.max_fee_per_gas.?) {
+                return error.PriorityFeeExceedsMaxFee;
             }
         }
 
@@ -223,7 +226,7 @@ pub const SigningProvider = struct {
     fn providerSend(ctx: *anyopaque, tx_: web3.TransactionRequest) !web3.Hash {
         var self: *Self = @ptrCast(@alignCast(ctx));
 
-        const tx = try self.populateTransaction(tx_);
+        const tx = try self.populateTransaction(tx_, .average);
         const signed_tx = try self.signer.signTransaction(self.allocator, tx);
         defer self.allocator.free(signed_tx);
 
@@ -231,7 +234,7 @@ pub const SigningProvider = struct {
     }
 
     /// Implementation of `web3.Provider.call`
-    fn providerCall(ctx: *anyopaque, tx_: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]const u8 {
+    fn providerCall(ctx: *anyopaque, allocator: std.mem.Allocator, tx_: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]const u8 {
         var self: *Self = @ptrCast(@alignCast(ctx));
 
         var tx = tx_;
@@ -240,7 +243,7 @@ pub const SigningProvider = struct {
             tx.from = try self.signer.getAddress();
         }
 
-        return self.child_provider.call(tx, block_tag);
+        return self.child_provider.call(allocator, tx, block_tag);
     }
 
     /// Implementation of `web3.Provider.estimateGas`
