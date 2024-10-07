@@ -96,7 +96,7 @@ pub const WordList = struct {
         const entropy_bits: u16 = @intCast(word_count * 11 - checksum_bits);
         const entropy_bytes: u16 = std.math.divCeil(u16, entropy_bits, 8) catch unreachable;
 
-        var out = try allocator.alloc(u8, entropy_bytes);
+        const out = try allocator.alloc(u8, entropy_bytes);
         errdefer allocator.free(out);
 
         switch (word_count) {
@@ -116,7 +116,7 @@ pub const WordList = struct {
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
         var allocator = gpa.allocator();
 
-        var entropy = self.decodeAlloc(allocator, mneomnic) catch return false;
+        const entropy = self.decodeAlloc(allocator, mneomnic) catch return false;
         allocator.free(entropy);
 
         return true;
@@ -146,7 +146,7 @@ pub const WordList = struct {
 
             // Lookup word index
             const word = buffer[0..word_len];
-            var index: u16 = @intCast(try self.lookup(word));
+            const index: u16 = @intCast(try self.lookup(word));
 
             // Loop over words and append each 11 bit value to the buffer
             var in_bits_remaining: usize = 11;
@@ -246,7 +246,7 @@ test "mnemonic" {
     assert(english.validate("robot need ribbon wink hard dice space immune equal tell castle grant fun absent pond"));
     assert(english.validate("cat arch host enforce mixture agent weapon salon praise soldier scout dismiss"));
 
-    var entropy = try english.decodeAlloc(allocator, "cat arch host enforce mixture agent weapon salon praise soldier scout dismiss");
+    const entropy = try english.decodeAlloc(allocator, "cat arch host enforce mixture agent weapon salon praise soldier scout dismiss");
     allocator.free(entropy);
 }
 

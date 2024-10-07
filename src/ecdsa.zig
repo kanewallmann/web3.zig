@@ -42,13 +42,13 @@ pub const SigningKey = struct {
 
     /// Calcultes pubkey and returns in compressed SEC1 format
     pub fn toPubkeyCompressedSec1(self: Self) ![33]u8 {
-        const pubkey = try curve.mul(curve.basePoint, self.privkey, .Big);
+        const pubkey = try curve.mul(curve.basePoint, self.privkey, .big);
         return pubkey.toCompressedSec1();
     }
 
     /// Calcultes pubkey and returns in uncompressed SEC1 format
     pub fn toPubkeyUncompressedSec1(self: Self) ![65]u8 {
-        const pubkey = try curve.mul(curve.basePoint, self.privkey, .Big);
+        const pubkey = try curve.mul(curve.basePoint, self.privkey, .big);
         return pubkey.toUncompressedSec1();
     }
 
@@ -62,16 +62,16 @@ pub const SigningKey = struct {
         var s: curve.scalar.Scalar = undefined;
         var y_parity: bool = false;
 
-        const da = curve.scalar.Scalar.fromBytes(self.privkey, .Big) catch return error.InvalidPrivateKey;
+        const da = curve.scalar.Scalar.fromBytes(self.privkey, .big) catch return error.InvalidPrivateKey;
 
         var counter: usize = 0;
         while (true) : (counter += 1) {
-            var k_bytes = self.generateNonce(message, counter);
-            var k = try curve.scalar.Scalar.fromBytes(k_bytes, .Big);
+            const k_bytes = self.generateNonce(message, counter);
+            var k = try curve.scalar.Scalar.fromBytes(k_bytes, .big);
 
             // Compute curve point
-            const p1 = (curve.basePoint.mul(k.toBytes(.Little), .Little) catch continue).affineCoordinates();
-            r = curve.scalar.Scalar.fromBytes(p1.x.toBytes(.Little), .Little) catch unreachable;
+            const p1 = (curve.basePoint.mul(k.toBytes(.little), .little) catch continue).affineCoordinates();
+            r = curve.scalar.Scalar.fromBytes(p1.x.toBytes(.little), .little) catch unreachable;
             if (r.isZero()) {
                 continue;
             }
@@ -92,10 +92,10 @@ pub const SigningKey = struct {
         var signature: Signature = undefined;
 
         var bytes = r.toBytes(native_endian);
-        signature.r = std.mem.readIntNative(u256, &bytes);
+        signature.r = std.mem.readInt(u256, &bytes, .little);
 
         bytes = s.toBytes(native_endian);
-        signature.s = std.mem.readIntNative(u256, &bytes);
+        signature.s = std.mem.readInt(u256, &bytes, .little);
 
         signature.v = @as(u256, if (y_parity) 1 else 0);
 
@@ -147,7 +147,7 @@ pub const SigningKey = struct {
 
         var i: usize = 0;
         while (true) : (i += 1) {
-            const k_int = std.mem.readIntBig(u256, v[0..32]);
+            const k_int = std.mem.readInt(u256, v[0..32], .big);
 
             if (i >= counter and k_int > 0 and k_int < curve.scalar.field_order) {
                 break;
@@ -193,12 +193,12 @@ pub const Signature = struct {
     pub fn verify(self: Self, pubkey: []const u8, message: []const u8) !bool {
         // Reconstruct r and s field elements
         var r_bytes: [32]u8 = undefined;
-        std.mem.writeIntLittle(u256, &r_bytes, self.r);
-        var r = curve.scalar.Scalar.fromBytes(r_bytes, .Little) catch return false;
+        std.mem.writeInt(u256, &r_bytes, self.r, .little);
+        var r = curve.scalar.Scalar.fromBytes(r_bytes, .little) catch return false;
 
         var s_bytes: [32]u8 = undefined;
-        std.mem.writeIntLittle(u256, &s_bytes, self.s);
-        var s = curve.scalar.Scalar.fromBytes(s_bytes, .Little) catch return false;
+        std.mem.writeInt(u256, &s_bytes, self.s, .little);
+        var s = curve.scalar.Scalar.fromBytes(s_bytes, .little) catch return false;
 
         // Hash message
         var hash: [32]u8 = undefined;
@@ -219,11 +219,11 @@ pub const Signature = struct {
         }
 
         // Compute (u_1 * G) + (u_2 * qa)
-        const p1 = curve.mulDoubleBasePublic(curve.basePoint, u_1.toBytes(.Little), qa, u_2.toBytes(.Little), .Little) catch return false;
+        const p1 = curve.mulDoubleBasePublic(curve.basePoint, u_1.toBytes(.little), qa, u_2.toBytes(.little), .little) catch return false;
 
         const affine = p1.affineCoordinates();
-        const affine_bytes = affine.x.toBytes(.Big);
-        const scalar = curve.scalar.Scalar.fromBytes(affine_bytes, .Big) catch unreachable;
+        const affine_bytes = affine.x.toBytes(.big);
+        const scalar = curve.scalar.Scalar.fromBytes(affine_bytes, .big) catch unreachable;
 
         // Check if r is congruent to x1 mod N
         return r.equivalent(scalar);
@@ -239,12 +239,12 @@ pub const Signature = struct {
     pub fn recoverPubkey(self: Self, message: []const u8) ![65]u8 {
         // Reconstruct r and s field elements
         var r_bytes: [32]u8 = undefined;
-        std.mem.writeIntLittle(u256, &r_bytes, self.r);
-        var r = try curve.scalar.Scalar.fromBytes(r_bytes, .Little);
+        std.mem.writeInt(u256, &r_bytes, self.r, .little);
+        var r = try curve.scalar.Scalar.fromBytes(r_bytes, .little);
 
         var s_bytes: [32]u8 = undefined;
-        std.mem.writeIntLittle(u256, &s_bytes, self.s);
-        var s = try curve.scalar.Scalar.fromBytes(s_bytes, .Little);
+        std.mem.writeInt(u256, &s_bytes, self.s, .little);
+        var s = try curve.scalar.Scalar.fromBytes(s_bytes, .little);
 
         // Hash message
         var hash: [32]u8 = undefined;
@@ -256,15 +256,15 @@ pub const Signature = struct {
         const u_1 = z.mul(rinv).neg();
         const u_2 = s.mul(rinv);
 
-        var is_odd = (self.v % 2) == 1;
+        const is_odd = (self.v % 2) == 1;
 
         // Reconstruct curve point R
-        var r_fe = try curve.Fe.fromBytes(r_bytes, .Little);
-        var y = try curve.recoverY(r_fe, is_odd);
+        const r_fe = try curve.Fe.fromBytes(r_bytes, .little);
+        const y = try curve.recoverY(r_fe, is_odd);
         const R = try curve.fromAffineCoordinates(.{ .x = r_fe, .y = y });
 
         // Compute (u_1 * G) + (u_2 * qa)
-        const qa = try curve.mulDoubleBasePublic(curve.basePoint, u_1.toBytes(.Little), R, u_2.toBytes(.Little), .Little);
+        const qa = try curve.mulDoubleBasePublic(curve.basePoint, u_1.toBytes(.little), R, u_2.toBytes(.little), .little);
 
         return qa.toUncompressedSec1();
     }
@@ -274,17 +274,17 @@ pub const Signature = struct {
 fn hashToScalar(hash: [32]u8) curve.scalar.Scalar {
     // std.debug.print("Hash = {}\n", .{std.fmt.fmtSliceHexLower(&hash)});
 
-    var z_int = std.mem.readIntBig(u256, &hash);
+    var z_int = std.mem.readInt(u256, &hash, .big);
 
     if (z_int < curve.scalar.field_order) {
-        return curve.scalar.Scalar.fromBytes(hash, .Big) catch unreachable;
+        return curve.scalar.Scalar.fromBytes(hash, .big) catch unreachable;
     }
 
     z_int -= curve.scalar.field_order;
 
     var z_bytes: [32]u8 = undefined;
-    std.mem.writeIntBig(u256, &z_bytes, z_int);
-    return curve.scalar.Scalar.fromBytes(z_bytes, .Big) catch unreachable;
+    std.mem.writeInt(u256, &z_bytes, z_int, .big);
+    return curve.scalar.Scalar.fromBytes(z_bytes, .big) catch unreachable;
 }
 
 test "address computation" {
@@ -347,7 +347,7 @@ test "eip-155" {
     defer allocator.free(signed_tx);
 
     var hex: [1024]u8 = undefined;
-    var result = try std.fmt.hexToBytes(&hex, "f86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83");
+    const result = try std.fmt.hexToBytes(&hex, "f86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83");
 
     assert(std.mem.eql(u8, result, signed_tx));
 }

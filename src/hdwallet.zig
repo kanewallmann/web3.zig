@@ -57,7 +57,7 @@ pub const Node = struct {
     /// Gets the public key for this node
     pub fn getPublicKey(self: Self) ![33]u8 {
         if (self.recovery == 0) {
-            const pubkey = try curve.mul(curve.basePoint, self.key, .Big);
+            const pubkey = try curve.mul(curve.basePoint, self.key, .big);
             return pubkey.toCompressedSec1();
         } else {
             var pubkey: [33]u8 = undefined;
@@ -133,14 +133,14 @@ pub const Node = struct {
         // Data = ser_P(K_par) || ser_32(i)
         in[0] = self.recovery;
         @memcpy(in[1..33], &self.key);
-        std.mem.writeIntBig(u32, in[33..][0..4], i);
+        std.mem.writeInt(u32, in[33..][0..4], i, .big);
 
         // HMAC-SHA512(c_par, Data)
         hmac.create(&out, &in, &self.chain_code);
 
         // ki = parse_256(IL) + k_par (mod n).
         const kpar = try curve.fromSec1(in[0..33]);
-        const pubkey = try curve.mul(curve.basePoint, out[0..32].*, .Big);
+        const pubkey = try curve.mul(curve.basePoint, out[0..32].*, .big);
         const ki = pubkey.add(kpar);
 
         const compressed_point = ki.toCompressedSec1();
@@ -163,23 +163,23 @@ pub const Node = struct {
             @memcpy(in[1..33], &self.key);
         } else {
             // Data = ser_P(point(k_par)) || ser_32(i)).
-            const pubkey = try curve.mul(curve.basePoint, self.key, .Big);
+            const pubkey = try curve.mul(curve.basePoint, self.key, .big);
             const compressed_point = pubkey.toCompressedSec1();
             @memcpy(in[0..33], &compressed_point);
         }
 
-        std.mem.writeIntBig(u32, in[33..][0..4], i);
+        std.mem.writeInt(u32, in[33..][0..4], i, .big);
 
         // HMAC-SHA512(c_par, Data)
         hmac.create(&out, &in, &self.chain_code);
 
-        const il = try curve.scalar.Scalar.fromBytes(out[0..32].*, .Big);
-        const kpar = try curve.scalar.Scalar.fromBytes(self.key, .Big);
+        const il = try curve.scalar.Scalar.fromBytes(out[0..32].*, .big);
+        const kpar = try curve.scalar.Scalar.fromBytes(self.key, .big);
         const ki = il.add(kpar);
 
         return Self{
             .recovery = 0,
-            .key = ki.toBytes(.Big),
+            .key = ki.toBytes(.big),
             .chain_code = out[32..64].*,
         };
     }
@@ -187,7 +187,7 @@ pub const Node = struct {
     /// Returns a "neutered" version of this node that is capable of deriving child pubkeys
     /// but not child privkeys
     pub fn neuter(self: Self) !Self {
-        const pubkey = try curve.mul(curve.basePoint, self.key, .Big);
+        const pubkey = try curve.mul(curve.basePoint, self.key, .big);
         const compressed_point = pubkey.toCompressedSec1();
 
         return Self{

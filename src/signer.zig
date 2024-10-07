@@ -56,7 +56,7 @@ pub const LocalSigner = struct {
         const account_node = try web3.hdwallet.Node.fromSeedAndPath(&seed, options.path);
         const node = try account_node.derive(options.index);
 
-        var raw = try node.getPrivateKey();
+        const raw = try node.getPrivateKey();
         return fromPrivateKey(allocator, raw, .{
             .chain_id = options.chain_id,
         });
@@ -105,7 +105,7 @@ pub const LocalSigner = struct {
 
     // Implementation of `web3.Signer.getAddress`
     fn signerGetAddress(ctx: *anyopaque) !web3.Address {
-        var self: *Self = @ptrCast(@alignCast(ctx));
+        const self: *Self = @ptrCast(@alignCast(ctx));
         return self.address;
     }
 

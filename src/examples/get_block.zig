@@ -5,7 +5,7 @@ const web3 = @import("web3");
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.detectLeaks();
-    var allocator = gpa.allocator();
+    const allocator = gpa.allocator();
 
     // Get rpc endpoint from first arg
     var args = try std.process.argsWithAllocator(allocator);

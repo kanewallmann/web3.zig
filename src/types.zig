@@ -78,9 +78,9 @@ pub fn FixedPoint(comptime decimals: comptime_int, comptime T: anytype) type {
         pub const one: T = std.math.pow(T, 10, decimals);
 
         const Double = @Type(std.builtin.Type{
-            .Int = .{
-                .signedness = @typeInfo(T).Int.signedness,
-                .bits = @typeInfo(T).Int.bits * 2,
+            .int = .{
+                .signedness = @typeInfo(T).int.signedness,
+                .bits = @typeInfo(T).int.bits * 2,
             },
         });
 
@@ -243,7 +243,7 @@ pub const String = struct {
 
     /// Allocates memory and copies string from supplied buffer
     pub fn fromStringAlloc(allocator: std.mem.Allocator, buffer: []const u8) !Self {
-        var self = Self{
+        const self = Self{
             .raw = try allocator.alloc(u8, buffer.len),
         };
 
@@ -389,12 +389,12 @@ pub const AbiType = union(enum) {
     const Self = @This();
 
     // Common typedefs
-    pub const uint256 = Self{ .uint = .{ .bits = 256 } };
-    pub const uint8 = Self{ .uint = .{ .bits = 8 } };
-    pub const int256 = Self{ .int = .{ .bits = 256 } };
-    pub const address = Self{ .address = void{} };
-    pub const boolean = Self{ .boolean = void{} };
-    pub const string = Self{ .string = void{} };
+    pub const Uint256 = Self{ .uint = .{ .bits = 256 } };
+    pub const Uint8 = Self{ .uint = .{ .bits = 8 } };
+    pub const Int256 = Self{ .int = .{ .bits = 256 } };
+    pub const Address = Self{ .address = void{} };
+    pub const Boolean = Self{ .boolean = void{} };
+    pub const String = Self{ .string = void{} };
 
     /// uint<M>
     uint: struct {
@@ -547,7 +547,7 @@ pub const AbiType = union(enum) {
         }
     }
 
-    const fixed_types = std.ComptimeStringMap(Self, .{
+    const fixed_types = std.StaticStringMap(Self).initComptime(.{
         .{ "address", Self{ .address = void{} } },
         .{ "bool", Self{ .boolean = void{} } },
         .{ "function", Self{ .function = void{} } },
@@ -562,7 +562,7 @@ pub const AbiType = union(enum) {
 
         var arena = parser_allocator.ArenaAllocator.init(allocator);
         errdefer arena.deinit();
-        var parent_allocator = arena.allocator();
+        const parent_allocator = arena.allocator();
 
         const result = parse(parent_allocator, &local_buffer);
         arena.freeList();
@@ -590,7 +590,7 @@ pub const AbiType = union(enum) {
         if (buffer[0] == '(') {
             var fields = try std.ArrayList(AbiType).initCapacity(allocator, 1);
 
-            var i: usize = 1;
+            const i: usize = 1;
             _ = i;
 
             buffer = buffer[1..];
@@ -653,10 +653,11 @@ pub const AbiType = union(enum) {
             }
         } else {
             var found = false;
-            inline for (fixed_types.kvs) |fixed_type| {
-                if (buffer.len >= fixed_type.key.len and std.mem.eql(u8, buffer[0..fixed_type.key.len], fixed_type.key)) {
-                    child = fixed_type.value;
-                    buffer = buffer[fixed_type.key.len..];
+            inline for (fixed_types.kvs.*.keys[0..fixed_types.kvs.len]) |key| {
+                const value = fixed_types.get(key).?;
+                if (buffer.len >= key.len and std.mem.eql(u8, buffer[0..key.len], key)) {
+                    child = value;
+                    buffer = buffer[key.len..];
                     found = true;
                     break;
                 }
@@ -696,13 +697,13 @@ pub const AbiType = union(enum) {
 
                 if (size == 0) {
                     // Dynamic array
-                    var child_ptr = try allocator.create(AbiType);
+                    const child_ptr = try allocator.create(AbiType);
                     child_ptr.* = child;
                     child = Self{
                         .array = child_ptr,
                     };
                 } else {
-                    var child_ptr = try allocator.create(AbiType);
+                    const child_ptr = try allocator.create(AbiType);
                     child_ptr.* = child;
                     child = Self{
                         .fixed_array = .{
@@ -810,7 +811,7 @@ pub const TransactionRequest = struct {
                     self.gas.?,
                     if (self.to == null) web3.Address.zero.raw else self.to.?.raw,
                     if (self.value == null) 0 else self.value.?,
-                    if (self.data == null) &.{} else self.data.?.raw,
+                    if (self.data == null) @as([]const u8, &.{}) else self.data.?.raw,
                     if (self.v != null) self.v else if (self.chain_id != null) self.chain_id else 0,
                     if (self.r == null) 0 else self.r,
                     if (self.s == null) 0 else self.s,
@@ -831,7 +832,7 @@ pub const TransactionRequest = struct {
                     self.gas.?,
                     if (self.to == null) web3.Address.zero.raw else self.to.?.raw,
                     if (self.value == null) 0 else self.value.?,
-                    if (self.data == null) &.{} else self.data.?.raw,
+                    if (self.data == null) @as([]const u8, &.{}) else self.data.?.raw,
                     if (self.v != null) self.v else if (self.chain_id != null) self.chain_id else 0,
                     if (self.r == null) 0 else self.r,
                     if (self.s == null) 0 else self.s,
@@ -1330,7 +1331,7 @@ test "type parsing" {
         var typ = try AbiType.fromStringAlloc(allocator, input);
         defer typ.deinit(allocator);
 
-        var output = try allocator.alloc(u8, input.len);
+        const output = try allocator.alloc(u8, input.len);
         defer allocator.free(output);
 
         var stream = std.io.fixedBufferStream(output);

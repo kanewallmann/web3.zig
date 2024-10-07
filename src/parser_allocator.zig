@@ -81,7 +81,7 @@ pub const ArenaAllocator = struct {
     }
 
     inline fn pushNode(self: *ArenaAllocator, ptr: usize, log2_buf_align: u8, size: usize) !void {
-        var node = try self.child_allocator.create(BufNode);
+        const node = try self.child_allocator.create(BufNode);
         node.* = BufNode{ .data = .{
             .ptr = ptr,
             .log2_buf_align = log2_buf_align,
@@ -119,10 +119,10 @@ test "arena allocator" {
     var arena = ArenaAllocator.init(std.testing.allocator);
     var allocator = arena.allocator();
 
-    var a = try allocator.alloc(u8, 256);
+    const a = try allocator.alloc(u8, 256);
     _ = a;
-    var b = try allocator.alloc(u8, 256);
-    var c = try allocator.alloc(u8, 256);
+    const b = try allocator.alloc(u8, 256);
+    const c = try allocator.alloc(u8, 256);
     _ = c;
 
     allocator.free(b);

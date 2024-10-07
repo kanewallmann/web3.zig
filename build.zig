@@ -6,16 +6,17 @@ pub fn build(b: *std.Build) !void {
 
     // Module
     const web3_module = b.addModule("web3", .{
-        .source_file = .{
-            .path = "src/web3.zig",
+        .root_source_file = .{
+            .cwd_relative = "src/web3.zig",
         },
-        .dependencies = &.{},
     });
     try b.modules.put(b.dupe("web3"), web3_module);
 
     // Creates a step for unit testing
     const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/web3.zig" },
+        .root_source_file = .{
+            .cwd_relative = "src/web3.zig"
+        },
         .target = target,
         .optimize = optimize,
     });
@@ -28,7 +29,7 @@ pub fn build(b: *std.Build) !void {
 
     // Examples
     const example_dir_path = try std.fs.path.join(b.allocator, &[_][]const u8{ "src", "examples" });
-    const examples_dir = std.fs.cwd().openIterableDir(example_dir_path, .{}) catch return;
+    const examples_dir = std.fs.cwd().openDir(example_dir_path, .{ .iterate = true }) catch return;
 
     var examples_dir_iter = examples_dir.iterate();
     while (try examples_dir_iter.next()) |path| {
@@ -38,12 +39,14 @@ pub fn build(b: *std.Build) !void {
                     const example_path = std.fs.path.join(b.allocator, &[_][]const u8{ example_dir_path, path.name }) catch @panic("Out of memory");
                     const exe = b.addExecutable(.{
                         .name = std.fs.path.stem(path.name),
-                        .root_source_file = .{ .path = example_path },
+                        .root_source_file = .{
+                            .cwd_relative = example_path
+                        },
                         .target = target,
                         .optimize = optimize,
                     });
 
-                    exe.addModule("web3", web3_module);
+                    exe.root_module.addImport("web3", web3_module);
 
                     b.installArtifact(exe);
 

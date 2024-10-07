@@ -76,17 +76,17 @@ const JsonSyncStatus = union(enum) {
 comptime {
     // Not a perfect comparison but can catch mistakes early
     std.debug.assert(@sizeOf(JsonSyncStatus) == @sizeOf(web3.SyncStatus));
-    std.debug.assert(@typeInfo(JsonSyncStatus).Union.fields.len == @typeInfo(web3.SyncStatus).Union.fields.len);
+    std.debug.assert(@typeInfo(JsonSyncStatus).@"union".fields.len == @typeInfo(web3.SyncStatus).@"union".fields.len);
 }
 
 const json_rpc_header =
-    \\{"jsonrpc":"2.0","method":"
+\\{"jsonrpc":"2.0","method":"
 ;
 const params_header =
-    \\,"params":
+\\,"params":
 ;
 const id_header =
-    \\","id":
+\\","id":
 ;
 
 /// Handles communication with an Ethereum JSON RPC server. Reference: https://ethereum.org/en/developers/docs/apis/json-rpc/
@@ -149,37 +149,37 @@ pub const JsonRpcProvider = struct {
 
     /// Implementation of `web3.Provider.call`
     fn providerCall(ctx: *anyopaque, allocator: std.mem.Allocator, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]const u8 {
-        var self: *Self = @ptrCast(@alignCast(ctx));
+        const self: *Self = @ptrCast(@alignCast(ctx));
         return @call(.always_inline, callAlloc, .{ self, allocator, tx, block_tag });
     }
 
     /// Implementation of `web3.Provider.estimateGas`
     fn providerEstimateGas(ctx: *anyopaque, tx: web3.TransactionRequest) !u256 {
-        var self: *Self = @ptrCast(@alignCast(ctx));
+        const self: *Self = @ptrCast(@alignCast(ctx));
         return @call(.always_inline, estimateGas, .{ self, tx });
     }
 
     /// Implementation of `web3.Provider.send`
     fn providerSend(ctx: *anyopaque, tx: web3.TransactionRequest) !web3.Hash {
-        var self: *Self = @ptrCast(@alignCast(ctx));
+        const self: *Self = @ptrCast(@alignCast(ctx));
         return @call(.always_inline, sendTransaction, .{ self, tx });
     }
 
     /// Implementation of `web3.Provider.sendRaw`
     fn providerSendRaw(ctx: *anyopaque, raw_tx: []const u8) !web3.Hash {
-        var self: *Self = @ptrCast(@alignCast(ctx));
+        const self: *Self = @ptrCast(@alignCast(ctx));
         return @call(.always_inline, sendRawTransaction, .{ self, raw_tx });
     }
 
     /// Implementation of `web3.Provider.getTransactionCount`
     fn providerGetTransactionCount(ctx: *anyopaque, address: web3.Address, block_tag: ?web3.BlockTag) !u256 {
-        var self: *Self = @ptrCast(@alignCast(ctx));
+        const self: *Self = @ptrCast(@alignCast(ctx));
         return @call(.always_inline, getTransactionCount, .{ self, address, block_tag });
     }
 
     /// Implementation of `web3.Provider.getFeeEstimate`
     fn providerGetFeeEstimate(ctx: *anyopaque, speed: web3.FeeEstimateSpeed) !web3.FeeEstimate {
-        var self: *Self = @ptrCast(@alignCast(ctx));
+        const self: *Self = @ptrCast(@alignCast(ctx));
         return @call(.always_inline, getFeeEstimate, .{ self, speed });
     }
 
@@ -334,15 +334,15 @@ pub const JsonRpcProvider = struct {
 
     /// eth_signTransaction
     pub fn signTransaction(self: *Self, tx: web3.TransactionRequest) ![]const u8 {
-        var json_tx: *const web3.TransactionRequest = @ptrCast(&tx);
+        const json_tx: *const web3.TransactionRequest = @ptrCast(&tx);
         const params = .{json_tx};
-        var data: web3.DataHexString = try self.send("eth_signTransaction", params, web3.DataHexString);
+        const data: web3.DataHexString = try self.send("eth_signTransaction", params, web3.DataHexString);
         return data.raw;
     }
 
     /// eth_sendTransaction
     pub fn sendTransaction(self: *Self, tx: web3.TransactionRequest) !web3.Hash {
-        var json_tx: *const web3.TransactionRequest = @ptrCast(&tx);
+        const json_tx: *const web3.TransactionRequest = @ptrCast(&tx);
         const params = .{json_tx};
         return self.send("eth_sendTransaction", params, web3.Hash);
     }
@@ -362,29 +362,29 @@ pub const JsonRpcProvider = struct {
     }
 
     pub fn callAlloc(self: *Self, allocator: std.mem.Allocator, tx: web3.TransactionRequest, block_tag: ?web3.BlockTag) ![]const u8 {
-        var json_tx: *const web3.TransactionRequest = @ptrCast(&tx);
+        const json_tx: *const web3.TransactionRequest = @ptrCast(&tx);
         const params = .{ json_tx, self.blockTagToString(block_tag) };
-        var data: web3.DataHexString = try self.sendAlloc(allocator, "eth_call", params, web3.DataHexString);
+        const data: web3.DataHexString = try self.sendAlloc(allocator, "eth_call", params, web3.DataHexString);
         return data.raw;
     }
 
     /// eth_estimateGas
     pub fn estimateGas(self: *Self, tx: web3.TransactionRequest) !u256 {
-        var json_tx: *const web3.TransactionRequest = @ptrCast(&tx);
+        const json_tx: *const web3.TransactionRequest = @ptrCast(&tx);
         const params = .{json_tx};
         return self.send("eth_estimateGas", params, u256);
     }
 
     /// eth_getBlockByHash
     pub fn getBlockByHash(self: *Self, block_hash: web3.Hash, comptime full_transactions: bool) !web3.Block(full_transactions) {
-        var full = full_transactions;
+        const full = full_transactions;
         const params = .{ block_hash, full };
         return self.send("eth_getBlockByHash", params, web3.Block(full_transactions));
     }
 
     /// eth_getBlockByNumber
     pub fn getBlockByNumber(self: *Self, block_tag: ?web3.BlockTag, comptime full_transactions: bool) !web3.Block(full_transactions) {
-        var full = full_transactions;
+        const full = full_transactions;
         const params = .{ self.blockTagToString(block_tag), full };
         return self.send("eth_getBlockByNumber", params, web3.Block(full_transactions));
     }
@@ -486,7 +486,7 @@ pub const JsonRpcProvider = struct {
         try self.sendInternal(method, args);
 
         var arena = parser_allocator.ArenaAllocator.init(allocator);
-        var parent_allocator = arena.allocator();
+        const parent_allocator = arena.allocator();
 
         var ptr = self.response_buffer.items;
 
@@ -541,27 +541,28 @@ pub const JsonRpcProvider = struct {
         };
         defer client.deinit();
 
-        var headers = std.http.Headers{ .allocator = self.allocator };
-        defer headers.deinit();
+        const headers = std.http.Client.Request.Headers{ .content_type = .{ .override = "application/json" } };
 
-        // Add content length header
-        var length_str: [32]u8 = undefined;
-        const length_str_len = std.fmt.formatIntBuf(length_str[0..], data.len, 10, .lower, .{});
-        try headers.append("content-length", length_str[0..length_str_len]);
+        // Temp buffer used for response headers
+        var header_buffer: [1024]u8 = undefined;
 
-        try headers.append("content-type", "application/json");
+        var request = try client.open(.POST, self.endpoint, .{
+            .server_header_buffer = &header_buffer,
+            .headers = headers,
+        });
+        defer request.deinit();
+
+        request.transfer_encoding = .{ .content_length = data.len };
 
         // Perform the request
-        var req = try client.request(.POST, self.endpoint, headers, .{});
-        defer req.deinit();
-
-        try req.start();
-        _ = try req.write(data);
-        try req.wait();
+        try request.send();
+        _ = try request.write(data);
+        try request.finish();
+        try request.wait();
 
         // Read entire result into buffer
         self.response_buffer.items.len = 0;
-        try req.reader().readAllArrayList(&self.response_buffer, MAX_RESPONSE_BUFFER_SIZE);
+        try request.reader().readAllArrayList(&self.response_buffer, MAX_RESPONSE_BUFFER_SIZE);
     }
 
     /// Stringifies given block tag, uses internal buffer

@@ -42,47 +42,47 @@ pub const JsonWriter = struct {
         const T = @TypeOf(arg);
         const TI = @typeInfo(T);
 
-        if (TI == .Struct or TI == .Union) {
+        if (TI == .@"struct" or TI == .@"union") {
             if (@hasDecl(T, "toJson")) {
                 return arg.toJson(writer);
             }
         }
 
         switch (TI) {
-            .Int, .ComptimeInt => {
+            .int, .comptime_int => {
                 return writeHexInt(arg, writer);
             },
-            .Float, .ComptimeFloat => {
+            .float, .comptime_float => {
                 var buffer: [78]u8 = undefined;
-                var fbs = std.io.fixedBufferStream(&buffer);
-                try std.fmt.formatFloatDecimal(arg, .{}, fbs.writer());
+                const fbs = std.io.fixedBufferStream(&buffer);
+                try std.fmt.format(writer, "{d}", .{arg});
                 return writer.write(buffer[0..fbs.pos]);
             },
-            .Null => {
+            .null => {
                 return writer.write("null");
             },
-            .Optional => {
+            .optional => {
                 if (arg == null) {
                     return write(null, writer);
                 } else {
                     return write(arg.?, writer);
                 }
             },
-            .Bool => {
+            .bool => {
                 if (arg) {
                     return writer.write("true");
                 } else {
                     return writer.write("false");
                 }
             },
-            .Void, .NoReturn => {
+            .void, .noreturn => {
                 return;
             },
-            .Array => |arr| {
+            .array => |arr| {
                 const slice: []const arr.child = arg[0..];
                 return write(slice, writer);
             },
-            .Struct => |struct_t| {
+            .@"struct" => |struct_t| {
                 if (struct_t.is_tuple) {
                     try writer.writeByte('[');
 
@@ -90,14 +90,16 @@ pub const JsonWriter = struct {
 
                     var first = comptime true;
                     inline for (struct_t.fields) |field| {
-                        if (@typeInfo(field.type) != .Optional or @field(arg, field.name) != null) {
+                        if (@typeInfo(field.type) != .optional or @field(arg, field.name) != null) {
                             if (!first) {
                                 try writer.writeByte(',');
                                 total_size += 1;
                             }
                             first = false;
 
-                            total_size += try write(&@field(arg, field.name), writer);
+                            const value = @field(arg, field.name);
+
+                            total_size += try write(&value, writer);
                         }
                     }
 
@@ -112,7 +114,7 @@ pub const JsonWriter = struct {
                     inline for (struct_t.fields) |field| {
                         const val_ptr = &@field(arg, field.name);
 
-                        if (@typeInfo(field.type) != .Optional or val_ptr.* != null) {
+                        if (@typeInfo(field.type) != .optional or val_ptr.* != null) {
                             if (!first) {
                                 try writer.writeByte(',');
                                 total_size += 1;
@@ -134,7 +136,7 @@ pub const JsonWriter = struct {
                     return total_size;
                 }
             },
-            .Pointer => |ptr| {
+            .pointer => |ptr| {
                 switch (ptr.size) {
                     .One => {
                         return write(arg.*, writer);
@@ -268,7 +270,7 @@ pub const JsonReader = struct {
             }
         }
 
-        var size: usize = @intFromPtr(_buffer) - @intFromPtr(buffer.ptr);
+        const size: usize = @intFromPtr(_buffer) - @intFromPtr(buffer.ptr);
         var slice = buffer.*[0..size];
 
         if (string) {
@@ -328,8 +330,8 @@ pub const JsonReader = struct {
             }
         }
 
-        var size: usize = @intFromPtr(_buffer) - @intFromPtr(buffer.ptr);
-        var slice = buffer.*[0..size];
+        const size: usize = @intFromPtr(_buffer) - @intFromPtr(buffer.ptr);
+        const slice = buffer.*[0..size];
         return try std.fmt.parseFloat(T, slice);
     }
 
@@ -369,12 +371,12 @@ pub const JsonReader = struct {
 
         const TI = @typeInfo(T);
 
-        var field_exists: [TI.Struct.fields.len]bool = .{false} ** TI.Struct.fields.len;
+        var field_exists: [TI.@"struct".fields.len]bool = .{false} ** TI.@"struct".fields.len;
 
         while (_buffer.len > 0) {
             skipWhitespace(&_buffer);
 
-            var key = try parseString(&_buffer);
+            const key = try parseString(&_buffer);
 
             skipWhitespace(&_buffer);
 
@@ -387,7 +389,7 @@ pub const JsonReader = struct {
             skipWhitespace(&_buffer);
 
             var exists = false;
-            inline for (TI.Struct.fields, 0..) |field, i| {
+            inline for (TI.@"struct".fields, 0..) |field, i| {
                 const json_def = getJsonDef(T, field.name);
 
                 if (std.mem.eql(u8, json_def.field_name, key)) {
@@ -427,14 +429,14 @@ pub const JsonReader = struct {
             return error.ExpectedObjectClose;
         }
 
-        inline for (TI.Struct.fields, 0..) |field, i| {
+        inline for (TI.@"struct".fields, 0..) |field, i| {
             if (!field_exists[i]) {
                 const FTI = @typeInfo(field.type);
                 if (field.default_value) |default| {
                     const default_value = @as(*field.type, @constCast(@alignCast(@ptrCast(default)))).*;
                     @field(result, field.name) = default_value;
                 } else {
-                    if (FTI != .Optional) {
+                    if (FTI != .optional) {
                         return error.MissingRequiredField;
                     } else {
                         @field(result, field.name) = null;
@@ -715,7 +717,7 @@ pub const JsonReader = struct {
             return error.EndOfBuffer;
         }
 
-        if (TI == .Struct or TI == .Union) {
+        if (TI == .@"struct" or TI == .@"union") {
             if (@hasDecl(T, "fromJson")) {
                 return T.fromJson(allocator, buffer);
             } else {
@@ -729,20 +731,20 @@ pub const JsonReader = struct {
                         const str = try parseString(buffer);
                         return try T.fromStringAlloc(allocator, str);
                     }
-                } else if (TI == .Union) {
+                } else if (TI == .@"union") {
                     @compileError("Union requries a fromString or fromStringAlloc");
                 }
             }
         }
 
         switch (TI) {
-            .Int => {
+            .int => {
                 return parseInt(buffer, T);
             },
-            .Float => {
+            .float => {
                 return parseFloat(buffer, T);
             },
-            .Bool => {
+            .bool => {
                 if (buffer.len >= "true".len and std.mem.eql(u8, buffer.*[0.."true".len], "true")) {
                     buffer.* = buffer.*["true".len..];
                     return true;
@@ -752,17 +754,17 @@ pub const JsonReader = struct {
                 }
                 return error.InvalidBoolean;
             },
-            .Struct => |struct_t| {
+            .@"struct" => |struct_t| {
                 if (!struct_t.is_tuple) {
                     return try parseStruct(allocator, buffer, T);
                 } else {
                     return try parseTuple(allocator, buffer, T);
                 }
             },
-            .Union => {
+            .@"union" => {
                 return error.ParserError;
             },
-            .Pointer => |ptr| {
+            .pointer => |ptr| {
                 switch (ptr.size) {
                     .One => {
                         if (@hasDecl(ptr.child, "fromStringAlloc")) {
@@ -771,7 +773,7 @@ pub const JsonReader = struct {
                                 return try ptr.child.fromStringAlloc(allocator, str);
                             }
                         } else {
-                            var val = try allocator.create(ptr.child);
+                            const val = try allocator.create(ptr.child);
                             val.* = try parse(allocator, buffer, ptr.child);
                             return val;
                         }
@@ -790,17 +792,17 @@ pub const JsonReader = struct {
                     },
                 }
             },
-            .Array => |arr| {
+            .array => |arr| {
                 return try parseArray(allocator, buffer, arr.child, arr.len);
             },
-            .Optional => |opt| {
+            .optional => |opt| {
                 if (buffer.len >= "null".len and std.mem.eql(u8, buffer.*[0.."null".len], "null")) {
                     buffer.* = buffer.*["null".len..];
                     return null;
                 }
                 return try parse(allocator, buffer, opt.child);
             },
-            .Enum => |enum_t| {
+            .@"enum" => |enum_t| {
                 if (buffer.*[0] == '"') {
                     const str = try parseString(buffer);
                     inline for (enum_t.fields) |field| {
@@ -832,7 +834,7 @@ pub const JsonDef = struct {
 fn getJsonDef(comptime T: type, comptime field_name: []const u8) JsonDef {
     const TI = @typeInfo(T);
 
-    std.debug.assert(TI == .Struct);
+    std.debug.assert(TI == .@"struct");
 
     if (@hasDecl(T, "json_def")) {
         const json_defs = T.json_def;
@@ -882,7 +884,7 @@ test "reading" {
         const buf = "{\"hello\":\"0x20\",\"world\":\"0x40\"}";
 
         var ptr: []const u8 = buf[0..];
-        var result = try JsonReader.parse(allocator, &ptr, Struct);
+        const result = try JsonReader.parse(allocator, &ptr, Struct);
 
         assert(result.hello == 0x20);
         assert(result.world == 0x40);
@@ -898,7 +900,7 @@ test "reading" {
         const buf = "{\"hello\":\"0x20\"}";
 
         var ptr: []const u8 = buf[0..];
-        var result = try JsonReader.parse(allocator, &ptr, Struct);
+        const result = try JsonReader.parse(allocator, &ptr, Struct);
 
         assert(result.hello == 0x20);
         assert(result.world == 0x60);
@@ -909,7 +911,7 @@ test "reading" {
         const buf = "{";
 
         var ptr: []const u8 = buf[0..];
-        var result = JsonReader.parse(allocator, &ptr, u32);
+        const result = JsonReader.parse(allocator, &ptr, u32);
         try std.testing.expectError(error.UnexpectedCharacter, result);
     }
 
@@ -923,7 +925,7 @@ test "reading" {
         const buf = "{\"hello";
 
         var ptr: []const u8 = buf[0..];
-        var result = JsonReader.parse(allocator, &ptr, Struct);
+        const result = JsonReader.parse(allocator, &ptr, Struct);
         try std.testing.expectError(error.EndOfBuffer, result);
     }
 
@@ -937,7 +939,7 @@ test "reading" {
         const buf = "{\"hello\":\"0x20\"}";
 
         var ptr: []const u8 = buf[0..];
-        var result = JsonReader.parse(allocator, &ptr, Struct);
+        const result = JsonReader.parse(allocator, &ptr, Struct);
         try std.testing.expectError(error.MissingRequiredField, result);
     }
 }

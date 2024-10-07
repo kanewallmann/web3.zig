@@ -69,11 +69,11 @@ pub const AbiEntry = struct {
 
         // Allocate temporary memory to construct the function sig
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-        var allocator = gpa.allocator();
+        const allocator = gpa.allocator();
         var func_sig_buffer = try std.ArrayList(u8).initCapacity(allocator, 1024);
         defer func_sig_buffer.deinit();
 
-        var writer = func_sig_buffer.writer();
+        const writer = func_sig_buffer.writer();
         try self.formatSignature(writer);
 
         var hash_buffer: [32]u8 = undefined;
@@ -93,11 +93,11 @@ pub const AbiEntry = struct {
 
         // Allocate temporary memory to construct the function sig
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-        var allocator = gpa.allocator();
+        const allocator = gpa.allocator();
         var func_sig_buffer = try std.ArrayList(u8).initCapacity(allocator, 1024);
         defer func_sig_buffer.deinit();
 
-        var writer = func_sig_buffer.writer();
+        const writer = func_sig_buffer.writer();
         try self.formatSignature(writer);
 
         var hash_buffer: [32]u8 = undefined;
@@ -201,7 +201,7 @@ pub const Abi = struct {
 
     /// Finds an ABI entry with matching method name and args
     pub fn findEntry(self: *const Self, method: []const u8, arg_types: []web3.AbiType) !?*web3.abi.AbiEntry {
-        var entry: ?*web3.abi.AbiEntry = data: for (self.entries) |*entry| {
+        const entry: ?*web3.abi.AbiEntry = data: for (self.entries) |*entry| {
             if (entry.name) |entry_name| {
                 if (std.mem.eql(u8, method, entry_name)) {
                     if (entry.inputs) |inputs| {
@@ -224,7 +224,7 @@ pub const Abi = struct {
 
     /// Finds the first ABI entry with the given method name
     pub fn findFirstEntry(self: *const Self, method: []const u8) !?*web3.abi.AbiEntry {
-        var entry: ?*web3.abi.AbiEntry = data: for (self.entries) |*entry| {
+        const entry: ?*web3.abi.AbiEntry = data: for (self.entries) |*entry| {
             if (entry.name) |entry_name| {
                 if (std.mem.eql(u8, method, entry_name)) {
                     break :data entry;
@@ -241,7 +241,7 @@ fn isBytes(comptime T: type) bool {
     // Catch bugs where called at runtime
     if (!@inComptime()) @compileError("isBytes called at runtime");
     const TI = @typeInfo(T);
-    if (TI != .Struct) {
+    if (TI != .@"struct") {
         return false;
     }
     return @hasDecl(T, "__is_bytes");
@@ -252,7 +252,7 @@ fn isIndexed(comptime T: type) bool {
     // Catch bugs where called at runtime
     if (!@inComptime()) @compileError("isIndexed called at runtime");
     const TI = @typeInfo(T);
-    if (TI != .Struct) {
+    if (TI != .@"struct") {
         return false;
     }
     return @hasDecl(T, "__is_indexed");
@@ -263,7 +263,7 @@ fn isFixedPoint(comptime T: type) bool {
     // Catch bugs where called at runtime
     if (!@inComptime()) @compileError("isFixedPoint called at runtime");
     const TI = @typeInfo(T);
-    if (TI != .Struct) {
+    if (TI != .@"struct") {
         return false;
     }
     return @hasDecl(T, "__is_fixed_point");
@@ -281,17 +281,17 @@ pub const CalldataArgEncoder = struct {
     /// Encodes the inferred args to a newly allocated buffer prefixed with the given selector
     pub fn encodeWithSelector(allocator: std.mem.Allocator, selector: ?[4]u8, args: anytype) ![]u8 {
         const TI = @typeInfo(@TypeOf(args));
-        if (TI != .Struct and !TI.Struct.is_tuple) {
+        if (TI != .@"struct" and !TI.Struct.is_tuple) {
             @compileError("Supplied args must be a tuple");
         }
 
         // Calculate the size of the fixed args
         comptime var fixed_length = 0;
-        inline for (TI.Struct.fields) |field| {
+        inline for (TI.@"struct".fields) |field| {
             fixed_length += (comptime try getArgLength(field.type))[0];
         }
 
-        var selector_len: usize = if (selector == null) 0 else 4;
+        const selector_len: usize = if (selector == null) 0 else 4;
 
         var self = Self{
             .data = try std.ArrayList(u8).initCapacity(allocator, selector_len + fixed_length),
@@ -311,7 +311,7 @@ pub const CalldataArgEncoder = struct {
 
         // Loop over each fixed arg and write to buffer
         var i: usize = selector_len;
-        inline for (TI.Struct.fields) |field| {
+        inline for (TI.@"struct".fields) |field| {
             i += try self.writeArg(@field(args, field.name), i);
         }
 
@@ -332,7 +332,7 @@ pub const CalldataArgEncoder = struct {
     fn writeArg(self: *Self, arg: anytype, offset: usize) !usize {
         const ATT = @typeInfo(@TypeOf(arg));
         switch (ATT) {
-            .Pointer => |ptr_t| {
+            .pointer => |ptr_t| {
                 if (ptr_t.size != .Slice) {
                     @compileError("Cannot coerce non-slice pointer");
                 }
@@ -340,7 +340,7 @@ pub const CalldataArgEncoder = struct {
                 try self.writeDynamic(arg, offset);
                 return 32;
             },
-            .Struct => |struct_t| {
+            .@"struct" => |struct_t| {
                 if (@TypeOf(arg) == web3.String or @TypeOf(arg) == web3.ByteArray) {
                     try self.writeStringOrBytes(arg, offset);
                     return 32;
@@ -371,9 +371,9 @@ pub const CalldataArgEncoder = struct {
 
         const TI = @typeInfo(@TypeOf(arg));
         switch (TI) {
-            .Pointer => |ptr_t| {
+            .pointer => |ptr_t| {
                 const data_offset = self.fixed_length + self.dynamic_length;
-                std.mem.writeIntBig(u256, buffer[0..32], data_offset);
+                std.mem.writeInt(u256, buffer[0..32], data_offset, .big);
 
                 const arg_size = comptime try getArgLength(ptr_t.child);
                 const arr_size = (arg_size[0] * arg.len + 32);
@@ -384,16 +384,16 @@ pub const CalldataArgEncoder = struct {
                 self.data.items.len += arr_size;
 
                 buffer = self.data.items[data_offset..];
-                std.mem.writeIntBig(u256, buffer[0..32], arg.len);
+                std.mem.writeInt(u256, buffer[0..32], arg.len, .big);
 
                 var i: usize = 32;
                 for (arg) |child| {
                     i += try self.writeArg(child, data_offset + i);
                 }
             },
-            .Struct => |struct_t| {
+            .@"struct" => |struct_t| {
                 const data_offset = self.fixed_length + self.dynamic_length;
-                std.mem.writeIntBig(u256, buffer[0..32], data_offset);
+                std.mem.writeInt(u256, buffer[0..32], data_offset, .big);
 
                 var arr_size: usize = 0;
                 inline for (struct_t.fields) |field| {
@@ -428,29 +428,29 @@ pub const CalldataArgEncoder = struct {
 
         const ATT = @typeInfo(@TypeOf(arg));
         switch (ATT) {
-            .Bool => {
+            .bool => {
                 @memset(buffer, 0);
                 if (arg) {
                     buffer[31] = 1;
                 }
                 return 32;
             },
-            .Int => |arg_int| {
+            .int => |arg_int| {
                 switch (arg_int.signedness) {
                     .signed => {
                         const arg_i256: i256 = @intCast(arg);
-                        std.mem.writeIntBig(i256, buffer[0..32], arg_i256);
+                        std.mem.writeInt(i256, buffer[0..32], arg_i256, .big);
                     },
                     .unsigned => {
                         const arg_u256: u256 = @intCast(arg);
-                        std.mem.writeIntBig(u256, buffer[0..32], arg_u256);
+                        std.mem.writeInt(u256, buffer[0..32], arg_u256, .big);
                     },
                 }
                 return 32;
             },
-            .Pointer => |ptr_t| {
+            .pointer => |ptr_t| {
                 if (ptr_t.child == u8) {
-                    var size: u8 = arg.len;
+                    const size: u8 = arg.len;
                     @memset(buffer, 0);
                     @memcpy(buffer[0..size], arg[0..size]);
                     return 32;
@@ -458,14 +458,14 @@ pub const CalldataArgEncoder = struct {
                     unreachable;
                 }
             },
-            .Array => {
+            .array => {
                 var i: usize = 0;
                 for (arg) |child| {
                     i += try self.writeArg(child, offset + i);
                 }
                 return i;
             },
-            .Struct => |struct_t| {
+            .@"struct" => |struct_t| {
                 if (!struct_t.is_tuple) {
                     unreachable;
                 }
@@ -491,7 +491,7 @@ pub const CalldataArgEncoder = struct {
     fn writeStringOrBytes(self: *Self, arg: anytype, offset: usize) !void {
         var buffer = self.data.items[offset..];
         const data_offset = self.fixed_length + self.dynamic_length;
-        std.mem.writeIntBig(u256, buffer[0..32], data_offset);
+        std.mem.writeInt(u256, buffer[0..32], data_offset, .big);
 
         const slots = try std.math.divCeil(u64, arg.raw.len, 32);
         const arr_size = (slots + 1) * 32;
@@ -502,7 +502,7 @@ pub const CalldataArgEncoder = struct {
         self.data.items.len += arr_size;
 
         buffer = self.data.items[data_offset..];
-        std.mem.writeIntBig(u256, buffer[0..32], arg.raw.len);
+        std.mem.writeInt(u256, buffer[0..32], arg.raw.len, .big);
 
         buffer = buffer[32..];
 
@@ -513,10 +513,10 @@ pub const CalldataArgEncoder = struct {
     fn getArgLength(comptime T: type) !struct { comptime_int, bool } {
         const TI = @typeInfo(T);
         switch (TI) {
-            .Int, .ComptimeInt, .Bool => {
+            .int, .comptime_int, .bool => {
                 return .{ 32, false };
             },
-            .Struct => |struct_t| {
+            .@"struct" => |struct_t| {
                 switch (T) {
                     web3.Address => return .{ 32, false },
                     web3.Function => return .{ 32, false },
@@ -540,14 +540,14 @@ pub const CalldataArgEncoder = struct {
                 }
                 return .{ len, false };
             },
-            .Array => |array_t| {
+            .array => |array_t| {
                 const child_len = try getArgLength(array_t.child);
                 if (child_len[1]) {
                     return .{ 32, true };
                 }
                 return .{ child_len[0] * array_t.len, false };
             },
-            .Pointer => {
+            .pointer => {
                 return .{ 32, true };
             },
             else => @compileError("Cannot encode arg of type " ++ @typeName(T)),
@@ -559,7 +559,7 @@ pub const CalldataArgEncoder = struct {
 pub fn parseJson(allocator: std.mem.Allocator, abi: []const u8) !Abi {
     var arena = parser_allocator.ArenaAllocator.init(allocator);
     errdefer arena.deinit();
-    var parent_allocator = arena.allocator();
+    const parent_allocator = arena.allocator();
 
     var ptr = abi;
     const entries = try web3.json.JsonReader.parse(parent_allocator, &ptr, []AbiEntry);
@@ -572,10 +572,10 @@ pub fn parseJson(allocator: std.mem.Allocator, abi: []const u8) !Abi {
 }
 
 fn decodeStringOrByteArray(allocator: std.mem.Allocator, buffer: []const u8, offset: usize, comptime T: type) !T {
-    const data_offset: usize = @intCast(std.mem.readIntBig(u256, buffer[offset..][0..32]));
-    const len: usize = @intCast(std.mem.readIntBig(u256, buffer[data_offset..][0..32]));
+    const data_offset: usize = @intCast(std.mem.readInt(u256, buffer[offset..][0..32], .big));
+    const len: usize = @intCast(std.mem.readInt(u256, buffer[data_offset..][0..32], .big));
 
-    var val: []u8 = try allocator.alloc(u8, len);
+    const val: []u8 = try allocator.alloc(u8, len);
     @memcpy(val, buffer[data_offset + 32 ..][0..len]);
     return T.wrap(val);
 }
@@ -585,9 +585,9 @@ fn decodeStringOrByteArray(allocator: std.mem.Allocator, buffer: []const u8, off
 fn stripIndexed(comptime T: type) type {
     const TI = @typeInfo(T);
 
-    var fields: [TI.Struct.fields.len]std.builtin.Type.StructField = undefined;
+    var fields: [TI.@"struct".fields.len]std.builtin.Type.StructField = undefined;
 
-    for (TI.Struct.fields, 0..) |field, i| {
+    for (TI.@"struct".fields, 0..) |field, i| {
         fields[i] = field;
 
         if (isIndexed(field.type)) {
@@ -595,13 +595,13 @@ fn stripIndexed(comptime T: type) type {
         }
     }
 
-    var S: std.builtin.Type = .{
-        .Struct = .{
-            .layout = TI.Struct.layout,
-            .backing_integer = TI.Struct.backing_integer,
-            .decls = TI.Struct.decls,
+    const S: std.builtin.Type = .{
+        .@"struct" = .{
+            .layout = TI.@"struct".layout,
+            .backing_integer = TI.@"struct".backing_integer,
+            .decls = TI.@"struct".decls,
             .fields = &fields,
-            .is_tuple = TI.Struct.is_tuple,
+            .is_tuple = TI.@"struct".is_tuple,
         },
     };
 
@@ -611,13 +611,13 @@ fn stripIndexed(comptime T: type) type {
 /// Decodes multiple arguments from the given log inferring types from the given struct type T
 pub fn decodeLog(allocator: std.mem.Allocator, log: web3.Log, comptime T: type) !stripIndexed(T) {
     const TI = @typeInfo(T);
-    if (TI != .Struct) {
+    if (TI != .@"struct") {
         @compileError("Supplied type must be a struct");
     }
 
     var result: stripIndexed(T) = undefined;
 
-    inline for (TI.Struct.fields, 0..) |field, i| {
+    inline for (TI.@"struct".fields, 0..) |field, i| {
         if (comptime isIndexed(field.type)) {
             @field(result, field.name) = try decodeLogArg(allocator, log, i, field.type.getType(), true);
         } else {
@@ -650,19 +650,19 @@ pub fn decodeArg(allocator: std.mem.Allocator, buffer: []const u8, offset: usize
     }
 
     switch (TI) {
-        .Int => |int_t| {
+        .int => |int_t| {
             switch (int_t.signedness) {
                 .unsigned => {
-                    const arg_u256 = std.mem.readIntBig(u256, buffer[offset..][0..32]);
+                    const arg_u256 = std.mem.readInt(u256, buffer[offset..][0..32], .big);
                     return @truncate(arg_u256);
                 },
                 .signed => {
-                    const arg_i256 = std.mem.readIntBig(i256, buffer[offset..][0..32]);
+                    const arg_i256 = std.mem.readInt(i256, buffer[offset..][0..32], .big);
                     return @truncate(arg_i256);
                 },
             }
         },
-        .Struct => |struct_t| {
+        .@"struct" => |struct_t| {
             if (T == web3.Address) {
                 var val: web3.Address = undefined;
                 @memcpy(&val.raw, buffer[offset + 12 ..][0..20]);
@@ -692,12 +692,12 @@ pub fn decodeArg(allocator: std.mem.Allocator, buffer: []const u8, offset: usize
             }
             return error.InvalidCoercion;
         },
-        .Bool => {
-            const arg_u256 = std.mem.readIntBig(u256, buffer[offset..][0..32]);
+        .bool => {
+            const arg_u256 = std.mem.readInt(u256, buffer[offset..][0..32], .big);
             return arg_u256 != 0;
         },
-        .Array => |array_t| {
-            var data_position: usize = @truncate(std.mem.readIntBig(u256, buffer[offset..][0..32]));
+        .array => |array_t| {
+            const data_position: usize = @truncate(std.mem.readInt(u256, buffer[offset..][0..32], .big));
 
             var val: T = undefined;
 
@@ -707,7 +707,7 @@ pub fn decodeArg(allocator: std.mem.Allocator, buffer: []const u8, offset: usize
 
             return val;
         },
-        .Pointer => |ptr_t| {
+        .pointer => |ptr_t| {
             if (ptr_t.child != u8 or ptr_t.size != .Slice) {
                 return error.InvalidCoercion;
             }
@@ -728,7 +728,7 @@ pub fn decodeArg(allocator: std.mem.Allocator, buffer: []const u8, offset: usize
 
             const str = buffer[data_offset..][0..str_len];
 
-            var str_copy = try allocator.alloc(u8, str_len);
+            const str_copy = try allocator.alloc(u8, str_len);
             @memcpy(str_copy, str);
             return str_copy;
         },
@@ -742,7 +742,7 @@ pub fn decodeArg(allocator: std.mem.Allocator, buffer: []const u8, offset: usize
 pub fn abiTypeOf(allocator: std.mem.Allocator, comptime T: type) !web3.AbiType {
     const TI = @typeInfo(T);
     switch (TI) {
-        .Int => |int_t| {
+        .int => |int_t| {
             if (int_t.bits > 256) {
                 @compileError("Cannot get abi type of integer with greater than 256 bits");
             }
@@ -755,10 +755,10 @@ pub fn abiTypeOf(allocator: std.mem.Allocator, comptime T: type) !web3.AbiType {
                 },
             }
         },
-        .Bool => {
+        .bool => {
             return web3.AbiType{ .boolean = void{} };
         },
-        .Struct => |struct_t| {
+        .@"struct" => |struct_t| {
             switch (T) {
                 web3.Address => return web3.AbiType{ .address = void{} },
                 web3.String => return web3.AbiType{ .string = void{} },
@@ -789,8 +789,8 @@ pub fn abiTypeOf(allocator: std.mem.Allocator, comptime T: type) !web3.AbiType {
                 .tuple = try types.toOwnedSlice(),
             };
         },
-        .Array => |array_t| {
-            var child_type = try allocator.create(web3.AbiType);
+        .array => |array_t| {
+            const child_type = try allocator.create(web3.AbiType);
             errdefer allocator.destroy(child_type);
 
             child_type.* = try abiTypeOf(allocator, array_t.child);
@@ -802,12 +802,12 @@ pub fn abiTypeOf(allocator: std.mem.Allocator, comptime T: type) !web3.AbiType {
                 },
             };
         },
-        .Pointer => |ptr_t| {
+        .pointer => |ptr_t| {
             if (ptr_t.size != .Slice) {
                 @compileError("Cannot get abi type of non-slice pointer");
             }
 
-            var child_type = try allocator.create(web3.AbiType);
+            const child_type = try allocator.create(web3.AbiType);
             errdefer allocator.destroy(child_type);
 
             child_type.* = try abiTypeOf(allocator, ptr_t.child);
@@ -846,13 +846,13 @@ pub fn computeSelectorFromSig(sig: []const u8) ![4]u8 {
 /// and inferred types of the supplied tuple T
 pub fn computeTopic(event: []const u8, comptime T: type) ![32]u8 {
     const TI = @typeInfo(T);
-    if (TI != .Struct and !TI.Struct.is_tuple) {
+    if (TI != .@"struct" and !TI.@"struct".is_tuple) {
         @compileError("Expected tuple type");
     }
 
     // Allocate temporary memory to construct the function sig
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    var allocator = gpa.allocator();
+    const allocator = gpa.allocator();
     var func_sig_buffer = try std.ArrayList(u8).initCapacity(allocator, 1024);
     defer func_sig_buffer.deinit();
 
@@ -919,7 +919,7 @@ test "encode" {
 
     // fixed array
     {
-        var bools: [2]bool = [_]bool{ true, false };
+        const bools: [2]bool = [_]bool{ true, false };
 
         const data = try CalldataArgEncoder.encode(allocator, .{bools});
         defer allocator.free(data);
@@ -935,7 +935,7 @@ test "encode" {
 
     // dynamic array
     {
-        var uints: []const u64 = &[_]u64{ 123, 456 };
+        const uints: []const u64 = &[_]u64{ 123, 456 };
 
         const data = try CalldataArgEncoder.encode(allocator, .{uints});
         defer allocator.free(data);
@@ -1135,7 +1135,7 @@ test "abiTypeOf" {
         const t = try abiTypeOf(allocator, struct { web3.Bytes(32), u32 });
         defer t.deinit(allocator);
 
-        var type_str = try std.fmt.allocPrint(allocator, "{}", .{t});
+        const type_str = try std.fmt.allocPrint(allocator, "{}", .{t});
         defer allocator.free(type_str);
 
         assert(std.mem.eql(u8, type_str, "(bytes32,uint32)"));
@@ -1145,7 +1145,7 @@ test "abiTypeOf" {
         const t = try abiTypeOf(allocator, [32]u256);
         defer t.deinit(allocator);
 
-        var type_str = try std.fmt.allocPrint(allocator, "{}", .{t});
+        const type_str = try std.fmt.allocPrint(allocator, "{}", .{t});
         defer allocator.free(type_str);
 
         assert(std.mem.eql(u8, type_str, "uint256[32]"));

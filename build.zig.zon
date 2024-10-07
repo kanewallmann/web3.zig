@@ -1,4 +1,7 @@
 .{
     .name = "web3.zig",
     .version = "0.0.1",
+    .paths = .{
+        ""
+    },
 }
